@@ -1,0 +1,1 @@
+# STAMP implementation for Go
