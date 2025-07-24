@@ -1,1 +1,1 @@
-all: sender receiver
+all: sender reflector
