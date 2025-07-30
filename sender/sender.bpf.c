@@ -1,23 +1,29 @@
 //go:build ignore
 
-#include "../bpf/stamp.h"
+// A REMINDER FOR ME BC IM STUPID
+// bpf_ntohs/l() AND bpf_be64_to_cpu() WHEN WE READ FROM A PACKET
+// bpf_htons/l() AND bpf_cpu_to_be64() WHEN WE WRITE INTO A PACKET
+
+#include "../headers/stamp.h"
 
 #include <stdint.h>
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
-//includes for packet header structs below
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/pkt_cls.h>
 #include <bpf/bpf_endian.h>
 #include <linux/udp.h>
+#include <linux/in.h>
+#include <linux/if_packet.h>
 
 char __license[] SEC("license")="GPL";
 
 //histogram - just an array
 struct {
   __uint(type, BPF_MAP_TYPE_ARRAY);
+  __type(key, __u32);
   __type(value, __u32);
   __uint(max_entries, 20);
 } hist SEC(".maps");
@@ -25,7 +31,7 @@ struct {
 //parsed packet's timestamps
 struct packet_ts{
   uint32_t seq;
-  uint64_t ts[4];
+  uint64_t ts[4]; //0-1 are outbound journey, 2-3 are inbound
 };
 
 //packet info - for output
@@ -38,62 +44,128 @@ struct {
 SEC("tcx/egress")
 int sender_out(struct __sk_buff *skb){
   //RETURN VALUE: ALWAYS TCX_PASS
-
-  //for-me check
-  //is it IP?
-  //we have to do this every time we want to consult an *skb field
-  //since *skb just points to an actual SKB in the kernel
-  __u32 proto;
-  bpf_probe_read_kernel(&proto,sizeof(__u32),&skb->protocol);
-  if(proto!=ETH_P_IP)
+  bpf_printk("Hello world!");
+  //is it an IP packet?
+  if(skb->protocol!=bpf_htons(ETH_P_IP)){
+    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
     return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  __u32 local_port, remote_port;
-  bpf_probe_read_kernel(&local_port,sizeof(__u32),&skb->local_port);
-  bpf_probe_read_kernel(&remote_port,sizeof(__u32),&skb->remote_port);
-  if(local_port!=862 && remote_port!=862)
-    return TCX_PASS;
+  }
+  bpf_printk("Passed L3 proto check");
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
   
   //IP header
-  struct iphdr *iph = data;
+  struct iphdr *iph = data+sizeof(struct ethhdr);
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
-  //sometimes(like here) they can be skipped
-  /* if (data + sizeof(struct iphdr) > data_end) */
-  /*   return TCX_PASS; */
-
+  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
+  //Is it UDP?
+  if (iph->protocol!=IPPROTO_UDP){
+    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
+    return TCX_PASS;
+  }
+  bpf_printk("Passed L4 proto check");
+  
   //UDP header
-  //yes we're doing pointer math
-  struct udphdr *udph = data + sizeof(struct iphdr);
-  /* if (data + sizeof(struct iphdr) + sizeof(struct udphdr) > data_end) */
-  /*   return TCX_PASS; */
-
-  //STAMP packet
-  /* struct senderpkt *packet = data + sizeof(struct iphdr) + sizeof(struct udphdr); */
-  /* if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct senderpkt) > data_end) */
-  /*   return TCX_PASS; */
-    
+  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
+  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
+  //862 is a well-known TWAMP port
+  //we'll need some communication mechanism for custom ports
+  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
+    bpf_printk("Failed UDP port check");
+    return TCX_PASS;
+  }
+  bpf_printk("Passed UDP port check");
+  
   // now we can timestamp it
-  /* uint64_t ts=timestamp(); */
-  uint64_t ts=69;
-  uint32_t offset=sizeof(struct iphdr)+sizeof(struct udphdr)+offsetof(struct senderpkt, t1);
+  bpf_printk("We got to a timestamp stage");
+  uint32_t offset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offsetof(struct senderpkt, t1_s);
+  struct ntp_ts ts;
+  timestamp(&ts);
   bpf_skb_store_bytes(skb, offset, &ts, sizeof(ts),0);
 
   // we're done
   return TCX_PASS;
-}
+} 
 
-/* SEC("tc/ingress") */
-/* int sender_in(struct __sk_buff *skb){ */
-/*   //RETURN VALUE: FOR-ME ? TC_ACT_SHOT : TCX_PASS */
-/*   //1. For-me check */
-/*   //2. Save the last timestamp */
-/*   //3. Grab three stamps+seq, write them into packet_ts struct */
-/*   //4. Update the histogram */
-/*   //5. We're done with the packet: */
-/*   return TCX_DROP; */
-/* } */
+SEC("tc/ingress")
+int sender_in(struct __sk_buff *skb){
+  //RETURN VALUE: FOR-ME ? TCX_DROP : TCX_PASS
+  
+  //timestamp as soon as we get the packet
+  uint64_t last_ts = bpf_ktime_get_tai_ns();
+
+  //is it IP?
+  if(skb->protocol!=bpf_htons(ETH_P_IP)){
+    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
+    return TCX_PASS;
+  }
+  bpf_printk("Passed L3 proto check");
+  
+  //grab the actual packet
+  void *data = (void *)(long)skb->data;
+  void *data_end = (void *)(long)skb->data_end;
+  
+  //IP header
+  struct iphdr *iph = data+sizeof(struct ethhdr);
+  //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
+  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
+  //TODO: is it for us? (send the local IP from userspace as part of the config)
+  /* if(iph->daddr!=skb->local_ip4) { */
+  /*   bpf_printk("Failed for-me IP check"); */
+  /*   return TCX_PASS; */
+  /* } */
+  
+  //Is it UDP?
+  if (iph->protocol!=IPPROTO_UDP){
+    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
+    return TCX_PASS;
+  }
+  bpf_printk("Passed L4 proto check");
+  
+  //UDP header
+  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
+  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
+  //862 is a well-known TWAMP port
+  //we'll need some communication mechanism for custom ports
+  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
+    bpf_printk("Failed UDP port check");
+    return TCX_PASS;
+  }
+  bpf_printk("Passed UDP port check");
+  
+  //Grab three stamps+seq
+  struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
+  if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
+    return TCX_PASS;
+  
+  struct packet_ts timestamps;
+  struct ntp_ts ntpts;
+  //grab seq
+  timestamps.seq=rf->seq;
+  //grab sender timestamp
+  ntpts.ntp_secs=rf->t1_s;
+  ntpts.ntp_fracs=rf->t1_f;
+  timestamps.ts[0]=untimestamp(&ntpts);
+  //grab reflector stamps
+  ntpts.ntp_secs=rf->t2_s;
+  ntpts.ntp_fracs=rf->t2_f;
+  timestamps.ts[1]=untimestamp(&ntpts);
+  ntpts.ntp_secs=rf->t3_s;
+  ntpts.ntp_fracs=rf->t3_f;
+  timestamps.ts[2]=untimestamp(&ntpts);
+  //save the last one we saved earlier
+  timestamps.ts[3]=last_ts;
+  //send it
+  bpf_ringbuf_output(&output, &timestamps, sizeof(struct packet_ts), 0);
+  
+  //TODO: histogram
+  
+  //We're done with the packet:
+  return TCX_DROP;
+}

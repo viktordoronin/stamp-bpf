@@ -3,55 +3,102 @@
 package main
 
 import (
+	"encoding/binary"
 	"errors"
-	"fmt"
 	"log"
 	"net"
-
+	"os/user"
+	
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/rlimit"
 )
 
+type senderpacket struct{
+	Seq uint32
+	Ts_s uint32
+	Ts_f uint32
+	MBZ [32]byte
+}
+
 func main(){
-	fmt.Print("Hello world\n")
-	// Remove resource limits for kernels <5.11.
-	if err := rlimit.RemoveMemlock(); err != nil { 
-		log.Fatal("Removing memlock:", err)
+	//check if we have root
+	if usr,_:=user.Current();usr.Uid!="0" {
+		log.Fatalf("Forgot sudo, dumbass")
 	}
 	
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs senderObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
 	if err := loadSenderObjects(&objs, &opts); err != nil {
-		//this bit prints out the full log on error
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
-			log.Fatalf("%+v\n", verr)
+			log.Fatalf("Verifier error: %+v\n", verr) 
 		}
-	} else {
-		fmt.Print("verifier logs:\n")
-		fmt.Print(objs.SenderOut.VerifierLog)
+		log.Fatalf("Error loading programs: %v",err)
+		} else {
+		log.Print("All programs successfully loaded and verified")
+		log.Print(objs.SenderOut.VerifierLog)
+		log.Print(objs.SenderIn.VerifierLog)
 	}
 	defer objs.Close()
-
-	var iface *net.Interface
-	var err error
 	
-	if iface, err = net.InterfaceByName("lo"); err!=nil{
+	iface, err := net.InterfaceByName("lo")
+	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
-	
+
 	tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
 		Program: objs.SenderOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
-
 	l_out,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 	defer l_out.Close()
 
+	tcxopts=link.TCXOptions{
+		Interface: iface.Index,
+		Program: objs.SenderIn,
+		Attach: ebpf.AttachTCXIngress,
+	}
+	l_in,err:=link.AttachTCX(tcxopts)
+	if err!=nil{
+		log.Fatalf("Error attaching the egress program: %v",err)
+	}
+	defer l_in.Close()
+	
+	//PACKET EMISSION
+	localaddr:=net.UDPAddr{
+		IP:net.ParseIP("127.0.0.1"),
+		Port: 862,
+	}
+	remoteaddr:=net.UDPAddr{
+		IP:net.ParseIP("127.0.0.1"),
+		Port: 862,
+	}
+	conn, err:=net.DialUDP("udp",&localaddr,&remoteaddr)
+	if err!=nil{
+		log.Fatalf("Error connecting: ",err)
+	}
+
+	go func(){
+		net.ListenUDP("udp",&localaddr)
+		for{}
+	}()
+	
+	mypacket:=senderpacket{
+		Seq: 0x69,
+		Ts_s: 0,
+		Ts_f: 0,
+	}
+	var buff = make([]byte,44)
+	_,err=binary.Encode(buff,binary.BigEndian,mypacket)
+	if err!=nil{
+		log.Fatalf("Encode error:",err)
+	}
+	
+	conn.Write(buff)
+	log.Print("(presumably) sent a packet...")
 }

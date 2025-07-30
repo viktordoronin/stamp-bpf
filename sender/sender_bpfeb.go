@@ -16,7 +16,8 @@ import (
 type senderPacketTs struct {
 	_   structs.HostLayout
 	Seq uint32
-	Ts  [4]uint32
+	_   [4]byte
+	Ts  [4]uint64
 }
 
 // loadSender returns the embedded CollectionSpec for sender.
@@ -61,6 +62,7 @@ type senderSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type senderProgramSpecs struct {
+	SenderIn  *ebpf.ProgramSpec `ebpf:"sender_in"`
 	SenderOut *ebpf.ProgramSpec `ebpf:"sender_out"`
 }
 
@@ -119,11 +121,13 @@ type senderVariables struct {
 //
 // It can be passed to loadSenderObjects or ebpf.CollectionSpec.LoadAndAssign.
 type senderPrograms struct {
+	SenderIn  *ebpf.Program `ebpf:"sender_in"`
 	SenderOut *ebpf.Program `ebpf:"sender_out"`
 }
 
 func (p *senderPrograms) Close() error {
 	return _SenderClose(
+		p.SenderIn,
 		p.SenderOut,
 	)
 }
