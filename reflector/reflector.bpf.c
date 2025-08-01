@@ -89,15 +89,35 @@ int reflector_in(struct __sk_buff *skb){
   //populate sender ts
   offset=stampoffset(offsetof(struct reflectorpkt, t1_s));
   bpf_skb_store_bytes(skb,offset,&sn_ts,sizeof(struct ntp_ts),0);
+  
   //grab and populate sender TTL
-  offset=stampoffset(offsetof(struct reflectorpkt, ttl));
-  uint8_t ttl;
-  uint32_t ipoffset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr);
-  bpf_skb_load_bytes(skb,ipoffset+offsetof(struct iphdr, ttl),&ttl,sizeof(uint8_t));
-  bpf_skb_store_bytes(skb,offset,&ttl,sizeof(uint8_t),0);
+  /* if(data+sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) */
+  /*   return TCX_PASS; */
+  /* uint8_t ttl; */
+  /* ttl=iph->ttl; */
+  /* offset=stampoffset(offsetof(struct reflectorpkt, ttl)); */
+  /* bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0); */
+  
+  /* uint32_t ipoffset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr); */
+  /* bpf_skb_load_bytes(skb,ipoffset+offsetof(struct iphdr, ttl),&ttl,sizeof(uint8_t)); */
 
-  //Redirection - I'll test if we can put this check before we change the packet
-  //maybe this is all unnecessary and I can do this instead:
+  //REDIRECTION
+  //Switch IP
+  uint32_t src_ip;
+  uint32_t dest_ip;
+  bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr),&src_ip,sizeof(src_ip));
+  bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr),&dest_ip,sizeof(dest_ip));
+  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr), &dest_ip, sizeof(dest_ip),0);
+  //the flag hopefully takes care of the checksum
+  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr), &src_ip, sizeof(src_ip),BPF_F_RECOMPUTE_CSUM);
+  
+  //Switch MAC
+  unsigned char src_mac[6], dest_mac[6];
+  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_source),src_mac,6);
+  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_dest),dest_mac,6);
+  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_source),dest_mac,6,0);
+  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,BPF_F_RECOMPUTE_CSUM);
+  
   //return bpf_redirect(skb->ifindex,0);
   uint64_t red = bpf_redirect(skb->ifindex,0);
   if (red==TCX_DROP) {

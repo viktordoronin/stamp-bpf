@@ -95,7 +95,7 @@ func main(){
 	}()
 	
 	mypacket:=senderpacket{
-		Seq: 0x69,
+		Seq: 0x1,
 		Ts_s: 0,
 		Ts_f: 0,
 	}	
@@ -122,12 +122,11 @@ func main(){
 			log.Print("Entered cycle")
 			record,err:=rd.Read()
 			if err!=nil{
-				log.Printf("Reading from ringbuf reader: %v",err)
-				continue
+				log.Fatalf("Reading from ringbuf reader: %v",err)
 			}
 			log.Print("Read a record")
 			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &ts); err!=nil {
-				log.Printf("Parsing ringbuf record: %v",err)
+				log.Fatalf("Parsing ringbuf record: %v",err)
 				continue
 			}
 			tsc <- ts
@@ -141,6 +140,11 @@ func main(){
 	timestamp = <- tsc
 
 	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d\n",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
+	if timestamp.Seq==0x10000000 {
+		log.Printf("Sequence numbers coincide")
+	} else {
+		log.Printf("Sequence numbers DO NOT coincide")
+	}
 	
 	// //this hangs up the program without destroying your CPU
 	var wg sync.WaitGroup
