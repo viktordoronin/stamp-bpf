@@ -3,15 +3,19 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"log"
 	"net"
 	"os/user"
-	
+	//	"time"
+
+	"sync"
+
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"sync"
+	"github.com/cilium/ebpf/ringbuf"
 )
 
 type senderpacket struct{
@@ -42,7 +46,8 @@ func main(){
 		log.Print(objs.SenderIn.VerifierLog)
 	}
 	defer objs.Close()
-	
+
+	// Attach TCX programs
 	iface, err := net.InterfaceByName("docker0")
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
@@ -93,16 +98,51 @@ func main(){
 		Seq: 0x69,
 		Ts_s: 0,
 		Ts_f: 0,
-	}
+	}	
 	var buff = make([]byte,44)
 	_,err=binary.Encode(buff,binary.BigEndian,mypacket)
 	if err!=nil{
 		log.Fatalf("Encode error:",err)
-	}
-	
+	}	
 	conn.Write(buff)
 	log.Print("(presumably) sent a packet...")
 
+	rd, err := ringbuf.NewReader(objs.Output)
+	if err != nil {
+		log.Fatalf("opening ringbuf reader: %s", err)
+	}
+	defer rd.Close()
+
+	//this goroutine polls the ringbuf every half a second 
+	var tsc = make(chan senderPacketTs)
+	go func(rd *ringbuf.Reader, tsc chan senderPacketTs){
+		log.Print("Entered goroutine")
+		var ts senderPacketTs
+		for {
+			log.Print("Entered cycle")
+			record,err:=rd.Read()
+			if err!=nil{
+				log.Printf("Reading from ringbuf reader: %v",err)
+				continue
+			}
+			log.Print("Read a record")
+			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &ts); err!=nil {
+				log.Printf("Parsing ringbuf record: %v",err)
+				continue
+			}
+			tsc <- ts
+			log.Print("sent a record to channel")
+			// time.Sleep(500*time.Millisecond)
+		}
+	}(rd,tsc)
+
+	var timestamp senderPacketTs
+	//I assume this blocks until received
+	timestamp = <- tsc
+
+	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d\n",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
+	
+	// //this hangs up the program without destroying your CPU
 	var wg sync.WaitGroup
 	wg.Add(1)
 }
