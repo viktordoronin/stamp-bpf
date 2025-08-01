@@ -11,6 +11,7 @@ import (
 	
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"sync"
 )
 
 type senderpacket struct{
@@ -42,7 +43,7 @@ func main(){
 	}
 	defer objs.Close()
 	
-	iface, err := net.InterfaceByName("lo")
+	iface, err := net.InterfaceByName("docker0")
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
@@ -71,11 +72,11 @@ func main(){
 	
 	//PACKET EMISSION
 	localaddr:=net.UDPAddr{
-		IP:net.ParseIP("127.0.0.1"),
+		IP:net.ParseIP("172.17.0.1"),
 		Port: 862,
 	}
 	remoteaddr:=net.UDPAddr{
-		IP:net.ParseIP("127.0.0.1"),
+		IP:net.ParseIP("172.17.0.2"),
 		Port: 862,
 	}
 	conn, err:=net.DialUDP("udp",&localaddr,&remoteaddr)
@@ -101,4 +102,7 @@ func main(){
 	
 	conn.Write(buff)
 	log.Print("(presumably) sent a packet...")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 }

@@ -10,9 +10,10 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"sync"
 )
 
-func main(){
+func main(){	
 	//check if we have root
 	if usr,_:=user.Current();usr.Uid!="0" {
 		log.Fatalf("Forgot sudo, dumbass")
@@ -34,7 +35,7 @@ func main(){
 	}
 	defer objs.Close()
 
-	iface, err := net.InterfaceByName("lo")
+	iface, err := net.InterfaceByName("eth0")
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
@@ -60,4 +61,17 @@ func main(){
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 	defer l_in.Close()
+
+	listaddr:=net.UDPAddr{
+		IP: net.ParseIP("172.17.0.1"),
+		Port: 862,
+	}
+	
+	go func(){
+		net.ListenUDP("udp",&listaddr)
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Wait()
 }

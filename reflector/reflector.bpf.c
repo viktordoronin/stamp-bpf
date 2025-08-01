@@ -91,7 +91,9 @@ int reflector_in(struct __sk_buff *skb){
   bpf_skb_store_bytes(skb,offset,&sn_ts,sizeof(struct ntp_ts),0);
   //grab and populate sender TTL
   offset=stampoffset(offsetof(struct reflectorpkt, ttl));
-  uint8_t ttl=iph->ttl;
+  uint8_t ttl;
+  uint32_t ipoffset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr);
+  bpf_skb_load_bytes(skb,ipoffset+offsetof(struct iphdr, ttl),&ttl,sizeof(uint8_t));
   bpf_skb_store_bytes(skb,offset,&ttl,sizeof(uint8_t),0);
 
   //Redirection - I'll test if we can put this check before we change the packet
@@ -155,7 +157,7 @@ int reflector_out(struct __sk_buff *skb){
   bpf_printk("Passed UDP port check");
 
   //populate t3
-  /* struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr); */
+  struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
     return TCX_PASS;
   uint32_t offset;

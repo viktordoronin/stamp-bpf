@@ -1,0 +1,25 @@
+services:
+  reflector:
+    container_name: stamp_reflector
+    build: ./reflector/
+    networks:
+      stamp:
+        ipv4_address: 172.18.0.2
+        interface_name: eth0
+
+  sender:
+    container_name: stamp_sender
+    build: ./sender/
+    depends_on:
+      - reflector
+    networks:
+      stamp:
+        ipv4_address: 172.18.0.1
+        interface_name: eth0
+        
+networks:
+  stamp:
+    ipam:
+      driver: bridge
+      config:
+        - subnet: 172.18.0.0/16

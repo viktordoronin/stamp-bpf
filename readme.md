@@ -12,3 +12,11 @@ This is a STAMP Protocol(RFC 8762) implementation using Go and eBPF. Implemented
 - Stateful mode
 - Authenticated mode
 - Advanced: combine sender and reflector into one binary(for ease of redistribution)
+# Docker notes
+- Start a container: `docker run -it --rm --privileged debian`
+- Host IP: 172.18.0.1
+- Mount debugfs:
+  - inside container: `mount -t debugfs debugfs /sys/kernel/debug`
+  - using daemon: `docker volume create --driver local --opt type=debugfs --opt device=debugfs debugfs` 
+	- then mount it: `-v debugfs:/sys/kernel/debug:rw`
+- Copy binary: `docker cp ./reflector.out nostalgic_gates:/home/reflector.out`
