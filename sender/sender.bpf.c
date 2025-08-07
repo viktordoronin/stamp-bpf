@@ -40,26 +40,11 @@ struct {
 SEC("tcx/egress")
 int sender_out(struct __sk_buff *skb){
   //RETURN VALUE: ALWAYS TCX_PASS
-  //TODO: Refactor this checking sequence into a separate function
-  //is it an IP packet?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)) return TCX_PASS;
-  //grab the actual packet
-  void *data = (void *)(long)skb->data;
-  void *data_end = (void *)(long)skb->data_end;  
-  //IP header
-  struct iphdr *iph = data+sizeof(struct ethhdr);
-  //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
-  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
-  //Is it UDP?
-  if (iph->protocol!=IPPROTO_UDP) return TCX_PASS;
-  //UDP header
-  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
-  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)) return TCX_PASS;
+
+  //for-me check
+  if ( ! for_me(skb) ) return TCX_PASS;
   
-  // now we can timestamp it
+  // T1
   uint32_t offset=stampoffset(offsetof(struct senderpkt, t1_s));
   //timestamp at the last possible moment
   struct ntp_ts ts;
@@ -75,41 +60,13 @@ int sender_in(struct __sk_buff *skb){
   //timestamp as soon as we get the packet
   uint64_t last_ts = bpf_ktime_get_tai_ns();
 
-  //is it IP?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    return TCX_PASS;
-  }
+  //for-me check
+  if (!for_me(skb)) return TCX_PASS;
   
-  //grab the actual packet
+  // grab the actual packet
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
-  
-  //IP header
-  struct iphdr *iph = data+sizeof(struct ethhdr);
-  //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
-  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  //TODO: is it for us? (send the local IP from userspace as part of the config)
-  /* if(iph->daddr!=skb->local_ip4) { */
-  /*   bpf_printk("Failed for-me IP check"); */
-  /*   return TCX_PASS; */
-  /* } */
-  
-  //Is it UDP?
-  if (iph->protocol!=IPPROTO_UDP){
-    return TCX_PASS;
-  }
-  
-  //UDP header
-  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
-  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    return TCX_PASS;
-  }
-
+    
   //Grab three stamps+seq
   struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
@@ -135,8 +92,8 @@ int sender_in(struct __sk_buff *skb){
   //send it
   bpf_ringbuf_output(&output, &timestamps, sizeof(struct packet_ts), 0);
   
-  //TODO: histogram
+  // TODO: histogram
   
   //We're done with the packet:
-  return TCX_DROP;
+  return TCX_DROP; 
 }

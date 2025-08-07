@@ -7,6 +7,7 @@
 #include <bpf/bpf_helpers.h>
 #include <linux/udp.h>
 #include <linux/ip.h>
+#include <linux/in.h>
 
 struct ntp_ts{
   uint32_t ntp_secs;
@@ -57,13 +58,35 @@ uint64_t untimestamp(struct ntp_ts *arg){
 /*   return utns; */
 /* } */
 
-//a simple function that adds the headers' sizeofs to a packet field's offsetof
+//for me check, DONE BEFORE ANY MODIFICATION OF THE PACKET, usage: if (!for_me(skb)) return TCX_PASS;
+uint32_t for_me(struct __sk_buff *skb){
+  //TCX_PASS evaluates to 0 so we can use this as a simple true-false function
+  //is it an IP packet?
+  if(skb->protocol!=bpf_htons(ETH_P_IP)) return TCX_PASS;
+  //grab the actual packet
+  void *data = (void *)(long)skb->data;
+  void *data_end = (void *)(long)skb->data_end;  
+  //IP header
+  struct iphdr *iph = data+sizeof(struct ethhdr);
+  //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
+  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
+  //Is it UDP?
+  if (iph->protocol!=IPPROTO_UDP) return TCX_PASS;
+  //UDP header
+  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
+  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
+  //862 is a well-known TWAMP port
+  //we'll need some communication mechanism for custom ports
+  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)) return TCX_PASS;
+  return 1;
+}
+
+//a simple function that adds the headers' sizeofs to a STAMP packet field's offsetof
 uint32_t stampoffset(uint32_t offset){
   return sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offset;
 }
 
 // we won't use these directly but they're still handy for offsetof()
-// 
 // session-sender packet(RFC 8762)
 struct senderpkt{
   uint32_t seq; //sequence number
@@ -72,7 +95,6 @@ struct senderpkt{
   uint16_t err; //error estimate(unused)
   uint8_t mbz[30]; //30 octets of MBZ
 }__attribute__((packed));
-
 // session-reflector packet(RFC 8762)
 struct reflectorpkt {
   uint32_t seq; //reflector seq

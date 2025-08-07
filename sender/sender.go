@@ -26,11 +26,12 @@ type senderpacket struct{
 }
 
 func main(){
-	//TODO: refactor this shit, it's a mess
-	//TODO: CLI interface, config map passed from userspace
+	// TODO: refactor this shit, it's a mess
+	// TODO: CLI interface, config map passed from userspace
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
 	//check if we have root
+	// TODO: check for caps too
 	if usr,_:=user.Current();usr.Uid!="0" {
 		log.Fatalf("Forgot sudo, dumbass")
 	}
@@ -117,7 +118,7 @@ func main(){
 	}
 	defer rd.Close()
 
-	//TODO: goroutines and continuously sending-parsing packets
+	// TODO: goroutines and continuously sending-parsing packets
 	//will probably require to listen on the same socket
 	
 	//this goroutine polls the ringbuf every half a second 
@@ -152,7 +153,10 @@ func main(){
 	if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
 		  log.Fatalf("Parsing ringbuf record: %v",err)
 		}
-	
+
+	// TODO: min max avg jitter
+	// TODO: packet loss(RTO customizable, default 1 sec); emit a warning prompting to customize RTO on high enough loss
+	// ideas: goroutines, time.Timer, time.Ticker, time.AfterFunc() (favouring this rn)
 	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
 	var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
 	var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6

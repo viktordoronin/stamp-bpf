@@ -19,39 +19,23 @@ char __license[] SEC("license")="GPL";
 SEC("tc/ingress")
 int reflector_in(struct __sk_buff *skb){
   //lots of work here - convert senderpkt into reflectorpkt
-  //Save the receive timestamp
+  //Save the receive timestamp ASAP
   struct ntp_ts rec_ts;
   timestamp(&rec_ts);
-  //is it IP?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    return TCX_PASS;
-  }
+
+  //for-me check
+  if (!for_me(skb)) return TCX_PASS;
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
-  
+
   //IP header
   struct iphdr *iph = data+sizeof(struct ethhdr);
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
   if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
     return TCX_PASS;
   
-  //Is it UDP?
-  if (iph->protocol!=IPPROTO_UDP){
-    return TCX_PASS;
-  }
-  
-  //UDP header
-  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
-  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    return TCX_PASS;
-  }
-
   //Strip sender packet
   struct senderpkt *sn = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct senderpkt) > data_end)
@@ -84,7 +68,7 @@ int reflector_in(struct __sk_buff *skb){
   bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0);
 
   //REDIRECTION
-  //TODO: REFACTOR
+  // TODO: REFACTOR
   
   //Switch IP
   if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
@@ -118,36 +102,13 @@ int reflector_in(struct __sk_buff *skb){
 SEC("tc/egress")
 int reflector_out(struct __sk_buff *skb){
   //light work - stamp a packet and send it on its way
-  
-  //is it IP?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    return TCX_PASS;
-  }
-  
+
+  //for-me check
+  if (!for_me(skb)) return TCX_PASS;
+
   //grab the actual packet
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
-  
-  //IP header
-  struct iphdr *iph = data+sizeof(struct ethhdr);
-  //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
-  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  
-  //Is it UDP?
-  if (iph->protocol!=IPPROTO_UDP){
-    return TCX_PASS;
-  }
-  
-  //UDP header
-  struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
-  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    return TCX_PASS;
-  }
   
   //populate t3  
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
