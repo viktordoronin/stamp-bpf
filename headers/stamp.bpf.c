@@ -82,7 +82,6 @@ uint32_t for_me(struct __sk_buff *skb){
 }
 
 // reflector func to send packet back
-// TODO: don't forget to switch port numbers too when I implement custom ports
 uint64_t pkt_turnaround(struct __sk_buff *skb){
   void* data = (void *)(long)skb->data;
   void* data_end = (void *)(long)skb->data_end;
@@ -104,6 +103,8 @@ uint64_t pkt_turnaround(struct __sk_buff *skb){
   bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,0);
 
   //Switch ports
+  data = (void *)(long)skb->data;
+  data_end = (void *)(long)skb->data_end;
   struct udphdr *udph=data+sizeof(struct ethhdr)+sizeof(struct iphdr);
   if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) > data_end) return TCX_PASS;
   uint16_t src_port=udph->source;

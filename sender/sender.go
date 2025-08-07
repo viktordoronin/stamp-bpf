@@ -16,6 +16,8 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
+
+	"kernel.org/pub/linux/libs/security/libcap/cap"
 )
 
 type senderpacket struct{
@@ -25,15 +27,25 @@ type senderpacket struct{
 	MBZ [32]byte
 }
 
+//This function checks if we got necessary caps for running this without root
+//returns false if we don't have them and true if we do
+// TODO: accept port number as arg to see if we need to check for CAP_NET_BIND_SERVICE
+func checkCaps() bool {
+	got:=cap.GetProc()
+	want,_:=cap.FromText("cap_net_bind_service,cap_net_admin,cap_bpf=ep")
+	diff,_:=got.Cf(want)
+	return diff!=0
+}
+
 func main(){
 	// TODO: refactor this shit, it's a mess
 	// TODO: CLI interface, config map passed from userspace
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
-	//check if we have root
-	// TODO: check for caps too
-	if usr,_:=user.Current();usr.Uid!="0" {
-		log.Fatalf("Forgot sudo, dumbass")
+	//check privileges
+	// TODO: add to reflector
+	if usr,_:=user.Current();usr.Uid!="0" && checkCaps() {
+		log.Fatalf("You need either root privileges or certain capabilities(check readme for details)")
 	}
 	
 	// Load the compiled eBPF ELF and load it into the kernel.

@@ -20,3 +20,8 @@ This is a STAMP Protocol(RFC 8762) implementation using Go and eBPF. Implemented
   - using daemon: `docker volume create --driver local --opt type=debugfs --opt device=debugfs debugfs` 
 	- then mount it: `-v debugfs:/sys/kernel/debug:rw`
 - Copy binary: `docker cp ./reflector.out nostalgic_gates:/home/reflector.out`
+# Caps
+- BPF portion requires CAP_BPF and CAP_NET_ADMIN; might require CAP_PERFMON in the future(check this if verifier yells at you) 
+- CAP_NET_BIND_SERVICE is required for `sender` if we dial from **SOURCE** port 862
+- do `sudo setcap 'cap_bpf=ep cap_net_admin=ep cap_net_bind_service=ep'` to do this in the shell; you can also set these caps in a Dockerfile
+- Caps set on a binary persist between builds so you only have to do it once
