@@ -1,6 +1,6 @@
 //go:build ignore
 
-#include "../headers/stamp.h"
+#include "../headers/stamp.bpf.h"
 
 #include <stdint.h>
 #include <linux/bpf.h>
