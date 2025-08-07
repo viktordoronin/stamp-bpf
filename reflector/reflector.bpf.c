@@ -63,40 +63,12 @@ int reflector_in(struct __sk_buff *skb){
   //populate sender TTL
   if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
      return TCX_PASS;
-  /* offset=sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + offsetof(struct reflectorpkt, ttl); */
   offset=stampoffset(offsetof(struct reflectorpkt, ttl));
   bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0);
 
-  //REDIRECTION
-  // TODO: REFACTOR
-  
-  //Switch IP
-  if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
-    return TCX_PASS;
-  uint32_t src_ip;
-  uint32_t dest_ip;
-  bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr),&src_ip,sizeof(src_ip));
-  bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr),&dest_ip,sizeof(dest_ip));
-  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr), &dest_ip, sizeof(dest_ip),0);
-  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr), &src_ip, sizeof(src_ip),0);
-  
-  //Switch MAC
-  if(data+sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
-  unsigned char src_mac[6], dest_mac[6];
-  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_source),src_mac,6);
-  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_dest),dest_mac,6);
-  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_source),dest_mac,6,0);
-  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,0);
-
-  //return bpf_redirect(skb->ifindex,0);
-  uint64_t red = bpf_redirect(skb->ifindex,0);
-  if (red==TCX_DROP) {
-    bpf_printk("Something went wrong at redirection, packet dropped");
-    return TCX_DROP;
-  }
-  
-  return TCX_REDIRECT;
+  //we attempt to redirect the packet
+  //this may quietly fail, check this in case of unexplainable packet loss
+  return pkt_turnaround(skb);
 } 
 
 SEC("tc/egress")

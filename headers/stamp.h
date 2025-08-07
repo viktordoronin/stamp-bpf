@@ -81,6 +81,33 @@ uint32_t for_me(struct __sk_buff *skb){
   return 1;
 }
 
+// reflector func to send packet back
+// TODO: don't forget to switch port numbers too when I implement custom ports
+uint64_t pkt_turnaround(struct __sk_buff *skb){
+  void* data = (void *)(long)skb->data;
+  void* data_end = (void *)(long)skb->data_end;
+  struct iphdr *iph = data+sizeof(struct ethhdr);
+  if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
+    return TCX_PASS;
+
+  //Switch IP
+  uint32_t src_ip=iph->saddr;
+  uint32_t dest_ip=iph->daddr;
+  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr), &dest_ip, sizeof(dest_ip),0);
+  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr), &src_ip, sizeof(src_ip),0);
+  
+  //Switch MAC
+  if(data+sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
+  unsigned char src_mac[6], dest_mac[6];
+  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_source),src_mac,6);
+  bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_dest),dest_mac,6);
+  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_source),dest_mac,6,0);
+  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,0);
+
+  return bpf_redirect(skb->ifindex,0);
+}
+
 //a simple function that adds the headers' sizeofs to a STAMP packet field's offsetof
 uint32_t stampoffset(uint32_t offset){
   return sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offset;
