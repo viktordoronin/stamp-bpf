@@ -1,9 +1,5 @@
 //go:build ignore
 
-// A REMINDER FOR ME BC IM STUPID
-// bpf_ntohs/l() AND bpf_be64_to_cpu() WHEN WE READ FROM A PACKET
-// bpf_htons/l() AND bpf_cpu_to_be64() WHEN WE WRITE INTO A PACKET
-
 #include "../headers/stamp.h"
 
 #include <stdint.h>
@@ -32,7 +28,7 @@ struct {
 struct packet_ts{
   uint32_t seq;
   uint64_t ts[4]; //0-1 are outbound journey, 2-3 are inbound
-};
+}__attribute__((packed));
 
 //packet info - for output
 struct {
@@ -44,50 +40,31 @@ struct {
 SEC("tcx/egress")
 int sender_out(struct __sk_buff *skb){
   //RETURN VALUE: ALWAYS TCX_PASS
-  bpf_printk("Hello world!");
+  //TODO: Refactor this checking sequence into a separate function
   //is it an IP packet?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
-    return TCX_PASS;
-  }
-  bpf_printk("Passed L3 proto check");
-  
+  if(skb->protocol!=bpf_htons(ETH_P_IP)) return TCX_PASS;
   //grab the actual packet
   void *data = (void *)(long)skb->data;
-  void *data_end = (void *)(long)skb->data_end;
-  
+  void *data_end = (void *)(long)skb->data_end;  
   //IP header
   struct iphdr *iph = data+sizeof(struct ethhdr);
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
-  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
+  if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
   //Is it UDP?
-  if (iph->protocol!=IPPROTO_UDP){
-    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
-    return TCX_PASS;
-  }
-  bpf_printk("Passed L4 proto check");
-  
+  if (iph->protocol!=IPPROTO_UDP) return TCX_PASS;
   //UDP header
   struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
-  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end)
-    return TCX_PASS;
+  if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
   //862 is a well-known TWAMP port
   //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    bpf_printk("Failed UDP port check");
-    return TCX_PASS;
-  }
-  bpf_printk("Passed UDP port check");
+  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)) return TCX_PASS;
   
   // now we can timestamp it
-  bpf_printk("We got to a timestamp stage");
-  uint32_t offset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offsetof(struct senderpkt, t1_s);
+  uint32_t offset=stampoffset(offsetof(struct senderpkt, t1_s));
+  //timestamp at the last possible moment
   struct ntp_ts ts;
   timestamp(&ts);
   bpf_skb_store_bytes(skb, offset, &ts, sizeof(ts),0);
-
-  // we're done
   return TCX_PASS;
 } 
 
@@ -100,10 +77,8 @@ int sender_in(struct __sk_buff *skb){
 
   //is it IP?
   if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
     return TCX_PASS;
   }
-  bpf_printk("Passed L3 proto check");
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
@@ -122,10 +97,8 @@ int sender_in(struct __sk_buff *skb){
   
   //Is it UDP?
   if (iph->protocol!=IPPROTO_UDP){
-    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
     return TCX_PASS;
   }
-  bpf_printk("Passed L4 proto check");
   
   //UDP header
   struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
@@ -134,11 +107,9 @@ int sender_in(struct __sk_buff *skb){
   //862 is a well-known TWAMP port
   //we'll need some communication mechanism for custom ports
   if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    bpf_printk("Failed UDP port check");
     return TCX_PASS;
   }
-  bpf_printk("Passed UDP port check");
-  
+
   //Grab three stamps+seq
   struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
@@ -147,7 +118,7 @@ int sender_in(struct __sk_buff *skb){
   struct packet_ts timestamps;
   struct ntp_ts ntpts;
   //grab seq
-  timestamps.seq=rf->seq;
+  timestamps.seq=bpf_ntohl(rf->seq);
   //grab sender timestamp
   ntpts.ntp_secs=rf->t1_s;
   ntpts.ntp_fracs=rf->t1_f;

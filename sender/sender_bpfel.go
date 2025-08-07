@@ -16,7 +16,6 @@ import (
 type senderPacketTs struct {
 	_   structs.HostLayout
 	Seq uint32
-	_   [4]byte
 	Ts  [4]uint64
 }
 

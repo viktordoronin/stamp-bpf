@@ -22,13 +22,10 @@ int reflector_in(struct __sk_buff *skb){
   //Save the receive timestamp
   struct ntp_ts rec_ts;
   timestamp(&rec_ts);
-
   //is it IP?
   if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
     return TCX_PASS;
   }
-  bpf_printk("Passed L3 proto check");
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
@@ -42,10 +39,8 @@ int reflector_in(struct __sk_buff *skb){
   
   //Is it UDP?
   if (iph->protocol!=IPPROTO_UDP){
-    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
     return TCX_PASS;
   }
-  bpf_printk("Passed L4 proto check");
   
   //UDP header
   struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
@@ -54,12 +49,10 @@ int reflector_in(struct __sk_buff *skb){
   //862 is a well-known TWAMP port
   //we'll need some communication mechanism for custom ports
   if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    bpf_printk("Failed UDP port check");
     return TCX_PASS;
   }
-  bpf_printk("Passed UDP port check");
 
-  //Strip senderpkt.seq and senderpkt.t1
+  //Strip sender packet
   struct senderpkt *sn = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct senderpkt) > data_end)
     return TCX_PASS;
@@ -67,19 +60,13 @@ int reflector_in(struct __sk_buff *skb){
   struct ntp_ts sn_ts;
   sn_ts.ntp_secs=sn->t1_s;
   sn_ts.ntp_fracs=sn->t1_f;
+  uint8_t ttl=iph->ttl;
   
   //Populate receivepkt(they're the same size so it's legal)
-  /* struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr); */
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
     return TCX_PASS;
   uint32_t offset; //we'll use this a lot
   //going from top to bottom - seq stays the same
-  //set t3 to zero
-  struct ntp_ts ts;
-  ts.ntp_secs=0;
-  ts.ntp_fracs=0;
-  offset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offsetof(struct reflectorpkt, t3_s);
-  bpf_skb_store_bytes(skb,offset,&ts,sizeof(ts),0);
   //populate t2
   offset=stampoffset(offsetof(struct reflectorpkt, t2_s));
   bpf_skb_store_bytes(skb,offset,&rec_ts,sizeof(rec_ts),0);
@@ -89,35 +76,35 @@ int reflector_in(struct __sk_buff *skb){
   //populate sender ts
   offset=stampoffset(offsetof(struct reflectorpkt, t1_s));
   bpf_skb_store_bytes(skb,offset,&sn_ts,sizeof(struct ntp_ts),0);
-  
-  //grab and populate sender TTL
-  /* if(data+sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) */
-  /*   return TCX_PASS; */
-  /* uint8_t ttl; */
-  /* ttl=iph->ttl; */
-  /* offset=stampoffset(offsetof(struct reflectorpkt, ttl)); */
-  /* bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0); */
-  
-  /* uint32_t ipoffset=sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr); */
-  /* bpf_skb_load_bytes(skb,ipoffset+offsetof(struct iphdr, ttl),&ttl,sizeof(uint8_t)); */
+  //populate sender TTL
+  if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
+     return TCX_PASS;
+  /* offset=sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + offsetof(struct reflectorpkt, ttl); */
+  offset=stampoffset(offsetof(struct reflectorpkt, ttl));
+  bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0);
 
   //REDIRECTION
+  //TODO: REFACTOR
+  
   //Switch IP
+  if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
+    return TCX_PASS;
   uint32_t src_ip;
   uint32_t dest_ip;
   bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr),&src_ip,sizeof(src_ip));
   bpf_skb_load_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr),&dest_ip,sizeof(dest_ip));
   bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, saddr), &dest_ip, sizeof(dest_ip),0);
-  //the flag hopefully takes care of the checksum
-  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr), &src_ip, sizeof(src_ip),BPF_F_RECOMPUTE_CSUM);
+  bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+offsetof(struct iphdr, daddr), &src_ip, sizeof(src_ip),0);
   
   //Switch MAC
+  if(data+sizeof(struct ethhdr) > data_end)
+    return TCX_PASS;
   unsigned char src_mac[6], dest_mac[6];
   bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_source),src_mac,6);
   bpf_skb_load_bytes(skb,offsetof(struct ethhdr, h_dest),dest_mac,6);
   bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_source),dest_mac,6,0);
-  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,BPF_F_RECOMPUTE_CSUM);
-  
+  bpf_skb_store_bytes(skb,offsetof(struct ethhdr, h_dest),src_mac,6,0);
+
   //return bpf_redirect(skb->ifindex,0);
   uint64_t red = bpf_redirect(skb->ifindex,0);
   if (red==TCX_DROP) {
@@ -131,16 +118,11 @@ int reflector_in(struct __sk_buff *skb){
 SEC("tc/egress")
 int reflector_out(struct __sk_buff *skb){
   //light work - stamp a packet and send it on its way
-
-  struct ntp_ts ts;
-  timestamp(&ts);
   
   //is it IP?
   if(skb->protocol!=bpf_htons(ETH_P_IP)){
-    bpf_printk("Failed L3 proto check, got: %d, wanted: %d",skb->protocol, bpf_htons(ETH_P_IP));
     return TCX_PASS;
   }
-  bpf_printk("Passed L3 proto check");
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
@@ -151,18 +133,11 @@ int reflector_out(struct __sk_buff *skb){
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
   if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end)
     return TCX_PASS;
-  //TODO: is it for us? (send the local IP from userspace as part of the config)
-  /* if(iph->daddr!=skb->local_ip4) { */
-  /*   bpf_printk("Failed for-me IP check"); */
-  /*   return TCX_PASS; */
-  /* } */
   
   //Is it UDP?
   if (iph->protocol!=IPPROTO_UDP){
-    bpf_printk("Failed L4 proto check, got: %d, wanted: %d",iph->protocol, IPPROTO_UDP);
     return TCX_PASS;
   }
-  bpf_printk("Passed L4 proto check");
   
   //UDP header
   struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
@@ -171,17 +146,17 @@ int reflector_out(struct __sk_buff *skb){
   //862 is a well-known TWAMP port
   //we'll need some communication mechanism for custom ports
   if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)){
-    bpf_printk("Failed UDP port check");
     return TCX_PASS;
   }
-  bpf_printk("Passed UDP port check");
-
-  //populate t3
-  struct reflectorpkt *rf = data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr);
+  
+  //populate t3  
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
     return TCX_PASS;
   uint32_t offset;
   offset=stampoffset(offsetof(struct reflectorpkt,t3_s));
+  //timestamp at the last possible moment
+  struct ntp_ts ts;
+  timestamp(&ts);
   bpf_skb_store_bytes(skb, offset, &ts, sizeof(ts),0);
   
   return TCX_PASS;

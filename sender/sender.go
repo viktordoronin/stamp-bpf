@@ -11,7 +11,7 @@ import (
 	"os/user"
 	//	"time"
 
-	"sync"
+	//"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -26,6 +26,10 @@ type senderpacket struct{
 }
 
 func main(){
+	//TODO: refactor this shit, it's a mess
+	//TODO: CLI interface, config map passed from userspace
+	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
+
 	//check if we have root
 	if usr,_:=user.Current();usr.Uid!="0" {
 		log.Fatalf("Forgot sudo, dumbass")
@@ -95,7 +99,7 @@ func main(){
 	}()
 	
 	mypacket:=senderpacket{
-		Seq: 0x1,
+		Seq: 0x12,
 		Ts_s: 0,
 		Ts_f: 0,
 	}	
@@ -113,40 +117,50 @@ func main(){
 	}
 	defer rd.Close()
 
+	//TODO: goroutines and continuously sending-parsing packets
+	//will probably require to listen on the same socket
+	
 	//this goroutine polls the ringbuf every half a second 
-	var tsc = make(chan senderPacketTs)
-	go func(rd *ringbuf.Reader, tsc chan senderPacketTs){
-		log.Print("Entered goroutine")
-		var ts senderPacketTs
-		for {
-			log.Print("Entered cycle")
-			record,err:=rd.Read()
-			if err!=nil{
-				log.Fatalf("Reading from ringbuf reader: %v",err)
-			}
-			log.Print("Read a record")
-			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &ts); err!=nil {
-				log.Fatalf("Parsing ringbuf record: %v",err)
-				continue
-			}
-			tsc <- ts
-			log.Print("sent a record to channel")
-			// time.Sleep(500*time.Millisecond)
-		}
-	}(rd,tsc)
+	// var tsc = make(chan senderPacketTs)
+	// go func(rd *ringbuf.Reader, tsc chan senderPacketTs){
+	// 	var ts senderPacketTs
+	// 	for {
+	// 		record,err:=rd.Read()
+	// 		if err!=nil{
+	// 			log.Fatalf("Reading from ringbuf reader: %v",err)
+	// 		}
+	// 		if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.BigEndian, &ts); err!=nil {
+	// 			log.Fatalf("Parsing ringbuf record: %v",err)
+	// 			continue
+	// 		}
+	// 		tsc <- ts
+	// 	}
+	// }(rd,tsc)
+
+	
+	//I assume this blocks until received
+	// timestamp = <- tsc
 
 	var timestamp senderPacketTs
-	//I assume this blocks until received
-	timestamp = <- tsc
-
-	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d\n",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
-	if timestamp.Seq==0x10000000 {
-		log.Printf("Sequence numbers coincide")
-	} else {
-		log.Printf("Sequence numbers DO NOT coincide")
+	var record ringbuf.Record
+	for {
+		record, err=rd.Read()
+		if err==nil{
+			break
+		}
 	}
+	if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
+		  log.Fatalf("Parsing ringbuf record: %v",err)
+		}
 	
-	// //this hangs up the program without destroying your CPU
-	var wg sync.WaitGroup
-	wg.Add(1)
+	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
+	var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
+	var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6
+	var inbound float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[2]) * 1e-6
+	log.Printf("Latencies:\nNear-end: %.3f ms\nFar-end: %.3f ms\nRoundtrip: %.3f ms",outbound,inbound,roundtrip)
+	
+	// this hangs up the program without destroying your CPU
+	// var wg sync.WaitGroup
+	// wg.Add(1)
+	// wg.Wait()
 }
