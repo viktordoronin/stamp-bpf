@@ -8,24 +8,20 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 
 	//	"time"
 
-	//"sync"
+	// "sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 
+	"github.com/viktordoronin/stamp-bpf/internals/bpf/sender"
+	"github.com/viktordoronin/stamp-bpf/internals/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internals/userspace/privileges"
 )
-
-type senderpacket struct{
-	Seq uint32
-	Ts_s uint32
-	Ts_f uint32
-	MBZ [32]byte
-}
 
 func main(){
 	// TODO: refactor this shit, it's a mess
@@ -36,11 +32,14 @@ func main(){
 	if err:=privileges.Check(); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
+
+	//I can't figure out how to put this stuff into a package while preserving everything that's relevant so I'll just keep it here
+	// TODO: put loading and attaching BPF into a package
 	
 	// Load the compiled eBPF ELF and load it into the kernel.
-	var objs senderObjects
+	var objs sender.SenderObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
-	if err := loadSenderObjects(&objs, &opts); err != nil {
+	if err := sender.LoadSenderObjects(&objs, &opts); err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
 			log.Fatalf("Verifier error: %+v\n", verr) 
@@ -80,89 +79,44 @@ func main(){
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 	defer l_in.Close()
-	
-	//PACKET EMISSION
-	localaddr:=net.UDPAddr{
-		IP:net.ParseIP("172.17.0.1"),
-		Port: 862,
-	}
-	remoteaddr:=net.UDPAddr{
-		IP:net.ParseIP("172.17.0.2"),
-		Port: 862,
-	}
-	conn, err:=net.DialUDP("udp",&localaddr,&remoteaddr)
-	if err!=nil{
-		log.Fatalf("Error connecting: ",err)
-	}
 
-	go func(){
-		net.ListenUDP("udp",&localaddr)
-		for{}
-	}()
-	
-	mypacket:=senderpacket{
-		Seq: 0x12,
-		Ts_s: 0,
-		Ts_f: 0,
-	}	
-	var buff = make([]byte,44)
-	_,err=binary.Encode(buff,binary.BigEndian,mypacket)
-	if err!=nil{
-		log.Fatalf("Encode error:",err)
-	}	
-	conn.Write(buff)
-	log.Print("(presumably) sent a packet...")
+	//send packets
+	go pktsender.StartSession(3, time.Second)
 
+	
+	//READOUTPUT
+	// TODO: refactor into a goroutinable package
 	rd, err := ringbuf.NewReader(objs.Output)
 	if err != nil {
 		log.Fatalf("opening ringbuf reader: %s", err)
 	}
 	defer rd.Close()
 
-	// TODO: goroutines and continuously sending-parsing packets
-	//will probably require to listen on the same socket
-	
-	//this goroutine polls the ringbuf every half a second 
-	// var tsc = make(chan senderPacketTs)
-	// go func(rd *ringbuf.Reader, tsc chan senderPacketTs){
-	// 	var ts senderPacketTs
-	// 	for {
-	// 		record,err:=rd.Read()
-	// 		if err!=nil{
-	// 			log.Fatalf("Reading from ringbuf reader: %v",err)
-	// 		}
-	// 		if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.BigEndian, &ts); err!=nil {
-	// 			log.Fatalf("Parsing ringbuf record: %v",err)
-	// 			continue
-	// 		}
-	// 		tsc <- ts
-	// 	}
-	// }(rd,tsc)
-
-	
-	//I assume this blocks until received
-	// timestamp = <- tsc
-
-	var timestamp senderPacketTs
+	var timestamp sender.SenderPacketTs
 	var record ringbuf.Record
+	// TODO: this needs to loop only until we've read <num> packets; implement after packet loss
 	for {
 		record, err=rd.Read()
+		//this fires when we read a record
 		if err==nil{
-			break
+			//read a record
+			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
+				log.Fatalf("Parsing ringbuf record: %v",err)
+			}
+			//calculate metrics and print them out
+			// TODO: min max avg jitter
+			// TODO: packet loss(RTO customizable, default 1 sec); emit a warning prompting to customize RTO on high enough loss
+			// ideas: goroutines, time.Timer, time.Ticker, time.AfterFunc() (favouring this rn)
+			var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
+			var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6
+			var inbound float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[2]) * 1e-6
+			log.Printf("Sequence number: %d",timestamp.Seq)
+			log.Printf("Latencies:\nNear-end: %.3f ms\nFar-end: %.3f ms\nRoundtrip: %.3f ms",outbound,inbound,roundtrip)
 		}
 	}
-	if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
-		  log.Fatalf("Parsing ringbuf record: %v",err)
-		}
+	
+	// log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
 
-	// TODO: min max avg jitter
-	// TODO: packet loss(RTO customizable, default 1 sec); emit a warning prompting to customize RTO on high enough loss
-	// ideas: goroutines, time.Timer, time.Ticker, time.AfterFunc() (favouring this rn)
-	log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
-	var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
-	var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6
-	var inbound float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[2]) * 1e-6
-	log.Printf("Latencies:\nNear-end: %.3f ms\nFar-end: %.3f ms\nRoundtrip: %.3f ms",outbound,inbound,roundtrip)
 	
 	// this hangs up the program without destroying your CPU
 	// var wg sync.WaitGroup
