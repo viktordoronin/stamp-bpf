@@ -13,6 +13,7 @@ import (
 	"sync"
 )
 
+// TODO: REFACTOR
 func main(){	
 	//check if we have root
 	if usr,_:=user.Current();usr.Uid!="0" {
