@@ -33,9 +33,6 @@ func main(){
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 
-	//I can't figure out how to put this stuff into a package while preserving everything that's relevant so I'll just keep it here
-	// TODO: put loading and attaching BPF into a package
-	
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs sender.SenderObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
@@ -57,7 +54,6 @@ func main(){
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
-
 	tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
 		Program: objs.SenderOut,
@@ -68,7 +64,6 @@ func main(){
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 	defer l_out.Close()
-
 	tcxopts=link.TCXOptions{
 		Interface: iface.Index,
 		Program: objs.SenderIn,
@@ -83,8 +78,7 @@ func main(){
 	//send packets
 	go pktsender.StartSession(3, time.Second)
 
-	
-	//READOUTPUT
+	//READ OUTPUT
 	// TODO: refactor into a goroutinable package
 	rd, err := ringbuf.NewReader(objs.Output)
 	if err != nil {

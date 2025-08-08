@@ -16,14 +16,6 @@
 
 char __license[] SEC("license")="GPL";
 
-//histogram - just an array
-struct {
-  __uint(type, BPF_MAP_TYPE_ARRAY);
-  __type(key, __u32);
-  __type(value, __u32);
-  __uint(max_entries, 20);
-} hist SEC(".maps");
-
 //parsed packet's timestamps
 struct packet_ts{
   uint32_t seq;
@@ -91,9 +83,7 @@ int sender_in(struct __sk_buff *skb){
   timestamps.ts[3]=last_ts;
   //send it
   bpf_ringbuf_output(&output, &timestamps, sizeof(struct packet_ts), 0);
-  
-  // TODO: histogram
-  
+   
   //We're done with the packet:
   return TCX_DROP; 
 }

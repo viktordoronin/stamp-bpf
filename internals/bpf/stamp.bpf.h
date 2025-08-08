@@ -107,11 +107,13 @@ uint64_t pkt_turnaround(struct __sk_buff *skb){
   data_end = (void *)(long)skb->data_end;
   struct udphdr *udph=data+sizeof(struct ethhdr)+sizeof(struct iphdr);
   if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) > data_end) return TCX_PASS;
+  // TODO: make sure this works correctly
+  if (udph->source != udph->dest) {
   uint16_t src_port=udph->source;
   uint16_t dest_port=udph->dest;
   bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+sizeof(struct iphdr)+offsetof(struct udphdr, source), &dest_port, sizeof(dest_port),0);
   bpf_skb_store_bytes(skb,sizeof(struct ethhdr)+sizeof(struct iphdr)+offsetof(struct udphdr, dest), &src_port, sizeof(src_port),0);
-
+  }
 
   return bpf_redirect(skb->ifindex,0);
 }
@@ -121,7 +123,6 @@ uint32_t stampoffset(uint32_t offset){
   return sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr)+offset;
 }
 
-// we won't use these directly but they're still handy for offsetof()
 // session-sender packet(RFC 8762)
 struct senderpkt{
   uint32_t seq; //sequence number
