@@ -62,15 +62,6 @@ func main(){
 	}
 	defer l_in.Close()
 
-	listaddr:=net.UDPAddr{
-		IP: net.ParseIP("172.17.0.1"),
-		Port: 862,
-	}
-	
-	go func(){
-		net.ListenUDP("udp",&listaddr)
-	}()
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 	wg.Wait()
