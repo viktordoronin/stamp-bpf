@@ -3,23 +3,21 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"time"
 
 	//	"time"
 
-	// "sync"
+	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 
 	"github.com/viktordoronin/stamp-bpf/internals/bpf/sender"
+	"github.com/viktordoronin/stamp-bpf/internals/userspace/outputrdr"
 	"github.com/viktordoronin/stamp-bpf/internals/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internals/userspace/privileges"
 )
@@ -36,6 +34,7 @@ func main(){
 
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs sender.SenderObjects
+	var l_in, l_out link.Link
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
 	if err := sender.LoadSenderObjects(&objs, &opts); err != nil {
 		var verr *ebpf.VerifierError
@@ -60,7 +59,7 @@ func main(){
 		Program: objs.SenderOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
-	l_out,err:=link.AttachTCX(tcxopts)
+	l_out,err=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
@@ -70,56 +69,27 @@ func main(){
 		Program: objs.SenderIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
-	l_in,err:=link.AttachTCX(tcxopts)
+	l_in,err=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 	defer l_in.Close()
+	
+	// send packets
+	// FYI ping default delay is 1 sec
+	go pktsender.StartSession(50, time.Second)
 
-	//send packets
-	go pktsender.StartSession(3, time.Second)
-
-	//READ OUTPUT
-	// TODO: refactor into a goroutinable package
+	//parse timestamps and print out the metrics
 	rd, err := ringbuf.NewReader(objs.Output)
 	if err != nil {
 		log.Fatalf("opening ringbuf reader: %s", err)
 	}
 	defer rd.Close()
-
-	var timestamp sender.SenderPacketTs
-	var record ringbuf.Record
-	empty:=bytes.Repeat([]byte(" "),16)
-	// TODO: this needs to loop only until we've read <num> packets; implement after packet loss
-	for {
-		record, err=rd.Read()
-		//this fires when we read a record
-		if err==nil{
-			//read a record
-			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
-				log.Fatalf("Parsing ringbuf record: %v",err)
-			}
-			//calculate metrics and print them out
-			// TODO: min max avg jitter
-			// TODO: packet loss(RTO customizable, default 1 sec); emit a warning prompting to customize RTO on high enough loss
-			// ideas: goroutines, time.Timer, time.Ticker, time.AfterFunc() (favouring this rn)
-			var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
-			var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6
-			var inbound float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[2]) * 1e-6
-			fmt.Printf("Sequence number: %d",timestamp.Seq)
-			fmt.Printf("Near-end: %.3f ms\n",outbound)
-			fmt.Printf("Far-end: %.3f ms\n",inbound)
-			fmt.Printf("Roundtrip: %.3f ms\n",roundtrip)
-			fmt.Printf("\033[F%s\033[F%s\033[F%[1]s\033[F%[1]s\r",empty)
-			
-		}
-	}
-	
-	// log.Printf("Sequence number: %d\nt1: %d\nt2: %d\nt3: %d\nt4: %d",timestamp.Seq, timestamp.Ts[0], timestamp.Ts[1], timestamp.Ts[2], timestamp.Ts[3])
-
+	go outputrdr.ReadOutput(rd)
 	
 	// this hangs up the program without destroying your CPU
-	// var wg sync.WaitGroup
-	// wg.Add(1)
-	// wg.Wait()
+	// TODO: errgroups
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Wait()
 }
