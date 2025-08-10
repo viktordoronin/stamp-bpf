@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -88,6 +89,7 @@ func main(){
 
 	var timestamp sender.SenderPacketTs
 	var record ringbuf.Record
+	empty:=bytes.Repeat([]byte(" "),16)
 	// TODO: this needs to loop only until we've read <num> packets; implement after packet loss
 	for {
 		record, err=rd.Read()
@@ -104,8 +106,12 @@ func main(){
 			var roundtrip float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[0]) * 1e-6
 			var outbound float64 = (float64) ( timestamp.Ts[1]-timestamp.Ts[0]) * 1e-6
 			var inbound float64 = (float64) ( timestamp.Ts[3]-timestamp.Ts[2]) * 1e-6
-			log.Printf("Sequence number: %d",timestamp.Seq)
-			log.Printf("Latencies:\nNear-end: %.3f ms\nFar-end: %.3f ms\nRoundtrip: %.3f ms",outbound,inbound,roundtrip)
+			fmt.Printf("Sequence number: %d",timestamp.Seq)
+			fmt.Printf("Near-end: %.3f ms\n",outbound)
+			fmt.Printf("Far-end: %.3f ms\n",inbound)
+			fmt.Printf("Roundtrip: %.3f ms\n",roundtrip)
+			fmt.Printf("\033[F%s\033[F%s\033[F%[1]s\033[F%[1]s\r",empty)
+			
 		}
 	}
 	
