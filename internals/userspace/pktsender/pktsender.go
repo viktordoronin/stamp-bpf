@@ -15,14 +15,7 @@ type senderpacket struct{
 }
 
 // TODO: implement errors
-// TODO: goroutine error handling
-func dialReflector() *net.UDPConn {
-	// TODO: remove this when I move away from hardcoded interfaces
-	// TODO: don't ask for interface at all, rely on dest IP instead
-	iface, err := net.InterfaceByName("docker0")
-	if err!=nil{
-		log.Fatalf("Could not get interface: %v",err)
-	}
+func dialReflector(iface *net.Interface) *net.UDPConn {
 	addrs,_:=iface.Addrs()	
 	localaddr:=net.UDPAddr{
 		IP:net.ParseIP(addrs[0].String()),
@@ -39,9 +32,9 @@ func dialReflector() *net.UDPConn {
 	return conn
 }
 
-func StartSession(packet_count uint32, interval time.Duration) {
+func StartSession(packet_count uint32, interval time.Duration, iface *net.Interface) {
 	//setup
-	conn:=dialReflector()
+	conn:=dialReflector(iface)
 	var seq uint32 = 1
 	ticker:=time.NewTicker(interval)
 	for packet_count >= seq {

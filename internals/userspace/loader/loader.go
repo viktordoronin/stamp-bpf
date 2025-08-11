@@ -10,9 +10,13 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internals/bpf/sender"
 )
 
-func LoadSender(objs *sender.SenderObjects, l_out, l_in *link.Link){
+// TODO: (struct loaderFDs, struct loaderArgs) before this gets out of hand
+// TODO: error handling
+func LoadSender(objs *sender.SenderObjects, l_out, l_in *link.Link, iface *net.Interface){
+	// Load TCX programs
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
-	if err := sender.LoadSenderObjects(objs, &opts); err != nil {
+	err := sender.LoadSenderObjects(objs, &opts)
+	if err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
 			log.Fatalf("Verifier error: %+v\n", verr) 
@@ -23,11 +27,8 @@ func LoadSender(objs *sender.SenderObjects, l_out, l_in *link.Link){
 		log.Print(objs.SenderOut.VerifierLog)
 		log.Print(objs.SenderIn.VerifierLog)
 	}
+	
 	// Attach TCX programs
-	iface, err := net.InterfaceByName("docker0")
-	if err!=nil{
-		log.Fatalf("Could not get interface: %v",err)
-	}
 	tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
 		Program: objs.SenderOut,

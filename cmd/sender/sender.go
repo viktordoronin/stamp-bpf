@@ -4,6 +4,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"time"
 
 	//	"time"
@@ -24,24 +25,31 @@ func main(){
 	// TODO: CLI interface, config map passed from userspace
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
-	//check privileges
+	// check privileges before we do anything else
 	if err:=privileges.Check(862); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 
+	// TODO: remove this when I move away from hardcoded interfaces
+	// TODO: look into parsing /proc/net/route and seeing if we can infer the interface from the dest IP
+	iface, err := net.InterfaceByName("docker0")
+	if err!=nil{
+		log.Fatalf("Could not get interface: %v",err)
+	}
+	
 	// Load the compiled eBPF ELF and load it into the kernel
 	// A bit messy but this way we get to properly handle the FDs without having a shitton of code here
 	var objs sender.SenderObjects
 	var l_in, l_out link.Link	
-	loader.LoadSender(&objs,&l_in,&l_out)
+	loader.LoadSender(&objs,&l_in,&l_out,iface)
 	defer objs.Close()
 	defer l_out.Close()
 	defer l_in.Close()
 	
 	// send packets
 	// FYI ping default delay is 1 sec
-	go pktsender.StartSession(4, time.Second)
-
+	go pktsender.StartSession(4, time.Second,iface)
+	
 	//parse timestamps and print out the metrics
 	rd, err := ringbuf.NewReader(objs.Output)
 	if err != nil {
