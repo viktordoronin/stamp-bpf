@@ -16,7 +16,7 @@ import (
 
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
-	"github.com/viktordoronin/stamp-bpf/internal/userspace/outputrdr"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/output"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
 )
@@ -25,20 +25,21 @@ func main(){
 	// TODO: CLI interface, config map passed from userspace
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
+	// TODO: move from hardcoded literals to hardcoded vars(opts typedef?) in preparation for CLI implementation
+	
 	// check privileges before we do anything else
 	if err:=privileges.Check(862); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 
-	// TODO: remove this when I move away from hardcoded interfaces
-	// TODO: look into parsing /proc/net/route and seeing if we can infer the interface from the dest IP
+	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
 	iface, err := net.InterfaceByName("docker0")
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
 	
 	// Load the compiled eBPF ELF and load it into the kernel
-	// A bit messy but this way we get to properly handle the FDs without having a shitton of code here
+	// A bit ugly but this way we get to properly handle the FDs without having a shitton of code here
 	var objs sender.SenderObjects
 	var l_in, l_out link.Link	
 	loader.LoadSender(&objs,&l_in,&l_out,iface)
@@ -56,7 +57,11 @@ func main(){
 		log.Fatalf("opening ringbuf reader: %s", err)
 	}
 	defer rd.Close()
-	go outputrdr.ReadOutput(rd)
+
+	// TODO: better name
+	channel:=make(chan sender.SenderPacketTs)
+	go output.ReadAndParse(rd,channel,time.Second)
+	go output.Printout(channel)
 	
 	// this hangs up the program without destroying your CPU
 	// TODO: errgroups

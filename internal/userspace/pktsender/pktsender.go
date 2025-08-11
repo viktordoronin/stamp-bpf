@@ -37,7 +37,7 @@ func StartSession(packet_count uint32, interval time.Duration, iface *net.Interf
 	conn:=dialReflector(iface)
 	var seq uint32 = 1
 	ticker:=time.NewTicker(interval)
-	for packet_count >= seq {
+	for packet_count >= seq || packet_count==0 {
 		var buff = make([]byte,44)
 		_,err:=binary.Encode(buff,binary.BigEndian,senderpacket{Seq: seq})
 		if err!=nil{
