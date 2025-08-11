@@ -7,7 +7,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/viktordoronin/stamp-bpf/internals/bpf/sender"
+	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
 // TODO: (struct loaderFDs, struct loaderArgs) before this gets out of hand

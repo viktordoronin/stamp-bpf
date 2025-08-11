@@ -14,11 +14,11 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 
-	"github.com/viktordoronin/stamp-bpf/internals/bpf/sender"
-	"github.com/viktordoronin/stamp-bpf/internals/userspace/loader"
-	"github.com/viktordoronin/stamp-bpf/internals/userspace/outputrdr"
-	"github.com/viktordoronin/stamp-bpf/internals/userspace/pktsender"
-	"github.com/viktordoronin/stamp-bpf/internals/userspace/privileges"
+	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/outputrdr"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/pktsender"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
 )
 
 func main(){
