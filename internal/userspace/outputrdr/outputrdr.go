@@ -28,7 +28,8 @@ func (metrics * stampMetrics) calcMetrics(sample float64){
 	// add the new packet and get the new average: (sum+z)/3
 	// full formula: avg=(oldavg*(pkts-1)+newpkt)/pkts
 	metrics.avg=(metrics.avg*(float64(pktCount)-1)+sample)/float64(pktCount)
-	// we define jitter as average deviation from the average ping, expressed in percent 
+	// we define jitter as average deviation from the average ping, expressed in percent
+	// no I don't know whether it makes sense or is even calculated correctly
 	jit:=math.Abs(metrics.avg-sample)
 	jit=(jit*(float64(pktCount)-1)+sample)/float64(pktCount)
 	metrics.jitter=jit/(metrics.avg/100)
