@@ -5,11 +5,10 @@ package main
 import (
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	//	"time"
-
-	"sync"
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
@@ -19,7 +18,6 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/output"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
-	"github.com/viktordoronin/stamp-bpf/internal/userspace/metrics"
 )
 
 func main(){
@@ -27,6 +25,11 @@ func main(){
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
 	// TODO: move from hardcoded literals to hardcoded vars(opts typedef?) in preparation for CLI implementation
+	var interval time.Duration = time.Second
+	var count uint32 = 0
+	var interf string = "docker0"
+	// var dest_ip, src_port, dest_port string
+	
 	
 	// check privileges before we do anything else
 	if err:=privileges.Check(862); err!=nil{
@@ -34,7 +37,7 @@ func main(){
 	}
 
 	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
-	iface, err := net.InterfaceByName("docker0")
+	iface, err := net.InterfaceByName(interf)
 	if err!=nil{
 		log.Fatalf("Could not get interface: %v",err)
 	}
@@ -50,7 +53,7 @@ func main(){
 	
 	// send packets
 	// FYI ping default delay is 1 sec
-	go pktsender.StartSession(0, time.Second,iface)
+	go pktsender.StartSession(count, interval,iface)
 	
 	//parse timestamps and print out the metrics
 	rd, err := ringbuf.NewReader(objs.Output)
@@ -59,14 +62,12 @@ func main(){
 	}
 	defer rd.Close()
 
-	// TODO: better name
-	channel:=make(chan metrics.Sample)
-	go output.ReadAndParse(rd,channel,time.Second)
-	go output.Printout(channel)
+	go output.ReadAndParse(rd,interval)
+	go output.UpdateAndPrint()
 	
 	// this hangs up the program without destroying your CPU
 	// TODO: errgroups
-	var wg sync.WaitGroup
-	wg.Add(1)
-	wg.Wait()
+	stopper := make(chan os.Signal, 1)
+	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
+	<-stopper
 }
