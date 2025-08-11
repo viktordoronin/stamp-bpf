@@ -25,7 +25,7 @@ func main(){
 	//opts: source/dest IP, source/dest port, (down the line) stateless/stateful, (way down the line) reflector/sender
 
 	//check privileges
-	if err:=privileges.Check(); err!=nil{
+	if err:=privileges.Check(862); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 

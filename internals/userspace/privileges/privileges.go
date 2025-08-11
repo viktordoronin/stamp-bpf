@@ -12,13 +12,20 @@ var errRoot = errors.New("You don't have the superuser privileges")
 
 // This function checks if we got necessary caps for running this without root
 // returns nil if OK
-// TODO: accept port number as arg to see if we need to check for CAP_NET_BIND_SERVICE
-func checkCaps() error {
+func checkCaps(port int) error {
 	got:=cap.GetProc()
-	want,err:=cap.FromText("cap_net_bind_service,cap_net_admin,cap_bpf=ep")
+	var err error
+	var want *cap.Set
+	// if it's not a well-known port we don't need bind cap
+	if port<1023 {
+		want,err=cap.FromText("cap_net_bind_service,cap_net_admin,cap_bpf=ep")
+	}	else {
+		want,err=cap.FromText("cap_net_admin,cap_bpf=ep")
+	}
 	if err!=nil{
 		return fmt.Errorf("Error generating required capabilities set: %w",err)
 	}
+	// if it's zero we cool
 	diff,err:=got.Cf(want)
 	if err!=nil{
 		return fmt.Errorf("Error diffing caps: %w",err)
@@ -42,8 +49,8 @@ func checkSu() error {
 }
 
 // User-facing function, fails if both checks fail
-func Check() error {
-	err1:=checkCaps()
+func Check(port int) error {
+	err1:=checkCaps(port)
 	err2:=checkSu()
 	if err1!=nil && err2!=nil {
 		return fmt.Errorf("Privilege check failed, errors: %w; %w",err1,err2)
