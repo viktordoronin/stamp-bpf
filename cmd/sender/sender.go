@@ -19,6 +19,7 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/output"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/metrics"
 )
 
 func main(){
@@ -49,7 +50,7 @@ func main(){
 	
 	// send packets
 	// FYI ping default delay is 1 sec
-	go pktsender.StartSession(4, time.Second,iface)
+	go pktsender.StartSession(0, time.Second,iface)
 	
 	//parse timestamps and print out the metrics
 	rd, err := ringbuf.NewReader(objs.Output)
@@ -59,7 +60,7 @@ func main(){
 	defer rd.Close()
 
 	// TODO: better name
-	channel:=make(chan sender.SenderPacketTs)
+	channel:=make(chan metrics.Sample)
 	go output.ReadAndParse(rd,channel,time.Second)
 	go output.Printout(channel)
 	

@@ -29,7 +29,7 @@ func NewSample(timestamp *sender.SenderPacketTs) Sample{
 
 // Metrics are network performance stats derived from latency
 type StampMetrics struct {
-	Min,Max,Avg,Jitter float64
+	Min,Max,Avg,Jitter,Last float64
 }
 func NewMetricsRecord() StampMetrics{
 	//we need to set this to maximum or else it will remain 0 forever
@@ -37,6 +37,7 @@ func NewMetricsRecord() StampMetrics{
 }
 // we update our Metrics with each new Sample
 func (metrics *StampMetrics) UpdateMetrics(sample float64){
+	metrics.Last=sample
 	metrics.Min=math.Min(metrics.Min,sample)
 	metrics.Max=math.Max(metrics.Max,sample)
 	// math: suppose we got an average of 2 packets so far: avg=(x+y)/2
@@ -64,8 +65,3 @@ func (col *Collection) UpdateCollection(sample Sample){
 	col.Far.UpdateMetrics(sample.Far)
 	col.Near.UpdateMetrics(sample.Near)
 }
-
-
-
-
-

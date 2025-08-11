@@ -12,13 +12,6 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/metrics"
 )
 
-// TODO: refactor this shit (lmao)
-// rough outline of what I intended to do:
-// metrics now has a new struct called Samples
-// ReadAndParse() parses timestamps into 3 samples and sends them into channel
-// We can implement it as NewSample() that increments PkgCount!
-// Printout() calls metrics pkg to calculate metrics and print the whole thing out
-
 func ReadAndParse(rd *ringbuf.Reader, output chan<- metrics.Sample, interval time.Duration){
 	//this ticks twice as fast to account for the fact that this can start earlier than the actual packet arrives
 	//they won't go out of sync either way but this should feel more responsive for longer intervals
@@ -41,10 +34,7 @@ func ReadAndParse(rd *ringbuf.Reader, output chan<- metrics.Sample, interval tim
 }
 
 func Printout(output <-chan metrics.Sample){
-	// TODO: make this look better(metrics collection?)
-	var roundTrip = metrics.NewRecord()
-	var nearEnd = metrics.NewRecord()
-	var farEnd = metrics.NewRecord()
+	m:=metrics.NewCollection()
 	// this needs to be >= max length of an output line
 	empty:=bytes.Repeat([]byte(" "),64)
 	// make space for the output
@@ -56,15 +46,12 @@ func Printout(output <-chan metrics.Sample){
 		//this flushes the previous output
 		fmt.Printf("\033[F%s\033[F%[1]s\033[F%[1]s\033[F%[1]s\r",empty)
 		// calculate latencies and update metrics
-		// TODO: move to metrics package
-		// TODO: make this work with the new sample format
-		roundTrip.CalcMetrics(sampleRT,pktCount)			
-		nearEnd.CalcMetrics(sampleNear,pktCount)			
-		farEnd.CalcMetrics(sampleFar,pktCount)
+		m.UpdateCollection(sample)
 		// print out metrics
+		// TODO: this should be done in metrics package(likely a stringer)
 		fmt.Printf("Packets processed: %d\n",metrics.PktCount) // TODO: packet loss
-		fmt.Printf("Roundtrip: min %.3fms max %.3fms avg %.3fms jitter %.2f%%\n",roundTrip.Min,roundTrip.Max,roundTrip.Avg, roundTrip.Jitter)
-		fmt.Printf("Near-end: min %.3fms max %.3fms avg %.3fms\n",nearEnd.Min,nearEnd.Max,nearEnd.Avg)
-		fmt.Printf("Far-end: min %.3fms max %.3fms avg %.3fms\n",farEnd.Min,farEnd.Max,farEnd.Avg)
+		fmt.Printf("Roundtrip: min %.3fms max %.3fms avg %.3fms last %.3fms jitter %.2f%%\n",m.RT.Min, m.RT.Max, m.RT.Avg, m.RT.Last, m.RT.Jitter)
+		fmt.Printf("Near-end: min %.3fms max %.3fms avg %.3fms jitter %.2f%%\n",m.Near.Min, m.Near.Max, m.Near.Avg, m.Near.Jitter)
+		fmt.Printf("Far-end: min %.3fms max %.3fms avg %.3fms jitter %.2f%%\n",m.Far.Min, m.Far.Max, m.Far.Avg, m.Far.Jitter)
 	}
 }
