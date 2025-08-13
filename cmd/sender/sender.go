@@ -10,38 +10,29 @@ import (
 	"syscall"
 	"time"
 
-
 	"github.com/cilium/ebpf/ringbuf"
-
 
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/cli"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
-	"github.com/viktordoronin/stamp-bpf/internal/userspace/output"
-	"github.com/viktordoronin/stamp-bpf/internal/userspace/pktsender"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
 )
-
-// this will probably need to be in a separate package
-var opts struct {
-	interval time.Duration
-	count uint32
-	interf string
-}
 
 func main(){
 	// TODO: arg checking and error handling
 	// should probably return some sort of struct with processed opts
-	cli.ParseSenderArgs()
+	args:=cli.ParseSenderArgs()
 	
 	// check privileges before we do anything else
-	if err:=privileges.Check(cli.SenderArgs.Src); err!=nil{
+	if err:=privileges.Check(args.Src); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 
+	// TODO: this is checked by cli
 	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
-	iface, err := net.InterfaceByName(cli.SenderArgs.Dev)
+	iface, err := net.InterfaceByName(args.Dev)
 	if err!=nil{
-		log.Fatalf("Could not get interface %s: %v",cli.SenderArgs.Dev,err)
+		log.Fatalf("Could not get interface %s: %v",args.Dev,err)
 	}
 	
 	// Load the compiled eBPF ELF and load it into the kernel
@@ -49,6 +40,7 @@ func main(){
 	defer fd.Close()
 	
 	//parse timestamps and print out the metrics
+	// TODO: fold this into stamp pkg
 	rd, err := ringbuf.NewReader(fd.Objs.Output)
 	if err != nil {
 		log.Fatalf("opening ringbuf reader: %s", err)
@@ -56,10 +48,11 @@ func main(){
 	defer rd.Close()
 
 	// TODO: put them into one package, likely start the goroutines from there
+	// TODO: stamp.Args
 	// we call these funcs from here so that we can fold it into a single errorgroup
-	go pktsender.StartSession(cli.SenderArgs.Count, time.Duration(cli.SenderArgs.Interval)*time.Millisecond, iface, cli.SenderArgs.IP)
-	go output.ReadAndParse(rd,time.Duration(cli.SenderArgs.Interval)*time.Millisecond)
-	go output.UpdateAndPrint()
+	go stamp.StartSession(args.Count, time.Duration(args.Interval)*time.Millisecond, iface, args.IP)
+	go stamp.ReadAndParse(rd,time.Duration(args.Interval)*time.Millisecond)
+	go stamp.UpdateAndPrint()
 	
 	// this hangs up the program without destroying your CPU
 	// TODO: errgroups

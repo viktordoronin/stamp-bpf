@@ -1,4 +1,4 @@
-package pktsender
+package stamp
 
 import (
 	"encoding/binary"

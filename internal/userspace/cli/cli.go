@@ -2,7 +2,7 @@ package cli
 
 import "github.com/alexflint/go-arg"
 
-var SenderArgs struct {
+type SenderArgs struct {
 	Dev string `arg:"positional,required"`
 	IP string `arg:"positional,required"`
 	Src int `arg:"-s" default:"862"`
@@ -11,17 +11,19 @@ var SenderArgs struct {
 	Interval uint32 `arg:"-i,--" default:"1000"`
 }
 
-func ParseSenderArgs() error {
-	arg.MustParse(&SenderArgs)
-	return nil
+func ParseSenderArgs() SenderArgs {
+	var args SenderArgs
+	arg.MustParse(&args)
+	return args
 }
 
-var ReflectorArgs struct {
+type ReflectorArgs struct {
 	Dev string `arg:"positional,required"`
 	Src int `arg:"-s" default:"862"`
 }
 
-func ParseReflectorArgs() error {
-	arg.MustParse(&SenderArgs)
-	return nil
+func ParseReflectorArgs() ReflectorArgs {
+	var args ReflectorArgs
+	arg.MustParse(&args)
+	return args
 }
