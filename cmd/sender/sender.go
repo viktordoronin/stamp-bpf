@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cilium/ebpf/link"
+
 	"github.com/cilium/ebpf/ringbuf"
 
-	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
+
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/cli"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/output"
@@ -47,15 +47,14 @@ func main(){
 	// Load the compiled eBPF ELF and load it into the kernel
 	// A bit ugly but this way we get to properly handle the FDs without having a shitton of code here
 	// TODO: the FDs could be package variables
-	var objs sender.SenderObjects
-	var l_in, l_out link.Link
-	loader.LoadSender(&objs,&l_in,&l_out,iface)
-	defer objs.Close()
-	defer l_out.Close()
-	defer l_in.Close()
+	// var objs sender.SenderObjects
+	// var l_in, l_out link.Link
+	loader.LoadSender(iface)
+	// TODO: make it nicer
+	defer loader.CloseFDs()
 	
 	//parse timestamps and print out the metrics
-	rd, err := ringbuf.NewReader(objs.Output)
+	rd, err := ringbuf.NewReader(loader.FDs.SObjs.Output)
 	if err != nil {
 		log.Fatalf("opening ringbuf reader: %s", err)
 	}

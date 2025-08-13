@@ -11,12 +11,26 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
-// TODO: (struct loaderFDs, struct loaderArgs) before this gets out of hand
+// TODO: make it into an interface with 2 different FD structs for sender and reflector, both with Close()
+
+var FDs struct {
+	SObjs sender.SenderObjects
+	RObjs reflector.ReflectorObjects
+	L_in,L_out link.Link
+}
+
+func CloseFDs(){
+	FDs.SObjs.Close()
+	FDs.RObjs.Close()
+	FDs.L_in.Close()
+	FDs.L_out.Close()
+}
+
 // TODO: error handling
-func LoadSender(objs *sender.SenderObjects, l_out, l_in *link.Link, iface *net.Interface){
+func LoadSender(iface *net.Interface){
 	// Load TCX programs
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
-	err := sender.LoadSenderObjects(objs, &opts)
+	err := sender.LoadSenderObjects(&FDs.SObjs, &opts)
 	if err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
@@ -25,26 +39,26 @@ func LoadSender(objs *sender.SenderObjects, l_out, l_in *link.Link, iface *net.I
 		log.Fatalf("Error loading programs: %v",err)
 		} else {
 		log.Print("All programs successfully loaded and verified")
-		log.Print(objs.SenderOut.VerifierLog)
-		log.Print(objs.SenderIn.VerifierLog)
+		log.Print(FDs.SObjs.SenderOut.VerifierLog)
+		log.Print(FDs.SObjs.SenderIn.VerifierLog)
 	}
 	
 	// Attach TCX programs
 	tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
-		Program: objs.SenderOut,
+		Program: FDs.SObjs.SenderOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
-	*l_out,err=link.AttachTCX(tcxopts)
+	FDs.L_out,err=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}	
 	tcxopts=link.TCXOptions{
 		Interface: iface.Index,
-		Program: objs.SenderIn,
+		Program: FDs.SObjs.SenderIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
-	*l_in,err=link.AttachTCX(tcxopts)
+	FDs.L_in,err=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
