@@ -13,6 +13,7 @@ import (
 // we do one session per sender run so we don't have to reinitialize it ever
 var PktCount uint32=0
 
+// TODO: maybe we should calculate the sample in BPF? 
 // a Sample is a trio of latencies calculated from 4 timestamps
 // Samples are used once and discarded
 type Sample struct{

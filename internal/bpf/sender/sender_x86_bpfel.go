@@ -69,7 +69,6 @@ type SenderProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type SenderMapSpecs struct {
-	Hist   *ebpf.MapSpec `ebpf:"hist"`
 	Output *ebpf.MapSpec `ebpf:"output"`
 }
 
@@ -99,13 +98,11 @@ func (o *SenderObjects) Close() error {
 //
 // It can be passed to LoadSenderObjects or ebpf.CollectionSpec.LoadAndAssign.
 type SenderMaps struct {
-	Hist   *ebpf.Map `ebpf:"hist"`
 	Output *ebpf.Map `ebpf:"output"`
 }
 
 func (m *SenderMaps) Close() error {
 	return _SenderClose(
-		m.Hist,
 		m.Output,
 	)
 }

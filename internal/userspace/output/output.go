@@ -53,6 +53,7 @@ func UpdateAndPrint(){
 		m.UpdateCollection(sample)
 		// print out metrics
 		// TODO: this should be done in metrics package(likely a stringer)
+		// TODO: PktCount should be managed by metrics, make it part of collection
 		fmt.Printf("Packets processed: %d\n",metrics.PktCount) 
 		fmt.Printf("Roundtrip: min %.3fms max %.3fms avg %.3fms last %.3fms jitter %.2f%%\n",m.RT.Min, m.RT.Max, m.RT.Avg, m.RT.Last, m.RT.Jitter)
 		fmt.Printf("Near-end: min %.3fms max %.3fms avg %.3fms jitter %.2f%%\n",m.Near.Min, m.Near.Max, m.Near.Avg, m.Near.Jitter)

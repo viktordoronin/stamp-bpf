@@ -9,6 +9,8 @@
 #include <linux/ip.h>
 #include <linux/in.h>
 
+struct senderpkt; //proto
+
 struct ntp_ts{
   uint32_t ntp_secs;
   uint32_t ntp_fracs;
@@ -58,14 +60,19 @@ uint64_t untimestamp(struct ntp_ts *arg){
 /*   return utns; */
 /* } */
 
-//for me check, DONE BEFORE ANY MODIFICATION OF THE PACKET, usage: if (!for_me(skb)) return TCX_PASS;
+// for me check, DONE BEFORE ANY MODIFICATION OF THE PACKET, usage: if (!for_me(skb)) return TCX_PASS;
+// TODO: check source/dest IP and ports against local(global var)
+// I might want to add an enum to differentiate between reflector check and sender check
 uint32_t for_me(struct __sk_buff *skb){
   //TCX_PASS evaluates to 0 so we can use this as a simple true-false function
-  //is it an IP packet?
-  if(skb->protocol!=bpf_htons(ETH_P_IP)) return TCX_PASS;
   //grab the actual packet
   void *data = (void *)(long)skb->data;
-  void *data_end = (void *)(long)skb->data_end;  
+  void *data_end = (void *)(long)skb->data_end;
+  if ( data + sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr) + 44 > data_end ) return TCX_PASS;
+  //is it an IP packet?
+  //the +0 has to be there, don't ask
+  struct ethhdr *eh = data+0;
+  if(eh->h_proto!=bpf_htons(ETH_P_IP)) return TCX_PASS;
   //IP header
   struct iphdr *iph = data+sizeof(struct ethhdr);
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded

@@ -53,7 +53,7 @@ func Check(port int) error {
 	err1:=checkCaps(port)
 	err2:=checkSu()
 	if err1!=nil && err2!=nil {
-		return fmt.Errorf("Privilege check failed, errors: %w; %w",err1,err2)
+		return fmt.Errorf("Privilege check failed, errors: \n%w \n%w\n(you need either, not both)",err1,err2)
 	}
 	return nil
 }
