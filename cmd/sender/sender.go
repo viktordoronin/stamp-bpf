@@ -45,16 +45,11 @@ func main(){
 	}
 	
 	// Load the compiled eBPF ELF and load it into the kernel
-	// A bit ugly but this way we get to properly handle the FDs without having a shitton of code here
-	// TODO: the FDs could be package variables
-	// var objs sender.SenderObjects
-	// var l_in, l_out link.Link
-	loader.LoadSender(iface)
-	// TODO: make it nicer
-	defer loader.CloseFDs()
+	fd:=loader.LoadSender(iface)
+	defer fd.Close()
 	
 	//parse timestamps and print out the metrics
-	rd, err := ringbuf.NewReader(loader.FDs.SObjs.Output)
+	rd, err := ringbuf.NewReader(fd.Objs.Output)
 	if err != nil {
 		log.Fatalf("opening ringbuf reader: %s", err)
 	}
