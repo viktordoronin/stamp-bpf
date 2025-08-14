@@ -1,3 +1,4 @@
 test/*
 *.out
 cmd/bin/*
+docker/demo/image.tar
