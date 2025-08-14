@@ -1,25 +1,40 @@
 services:
+      
   reflector:
     container_name: stamp_reflector
-    build: ./reflector/
+    cap_add:
+      - BPF
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    build:
+      context: ../
+      dockerfile: ./docker/reflector/Dockerfile
+    image: stamp/reflector
     networks:
-      stamp:
-        ipv4_address: 172.18.0.2
+      stamp-bpf:
+        ipv4_address: 172.30.0.3
         interface_name: eth0
-
+        
   sender:
     container_name: stamp_sender
-    build: ./sender/
+    cap_add:
+      - BPF
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    build:
+      context: ../
+      dockerfile: ./docker/sender/Dockerfile
+    image: stamp/sender
     depends_on:
       - reflector
     networks:
-      stamp:
-        ipv4_address: 172.18.0.1
+      stamp-bpf:
+        ipv4_address: 172.30.0.2
         interface_name: eth0
-        
+            
 networks:
-  stamp:
+  stamp-bpf:
+    driver: bridge
     ipam:
-      driver: bridge
       config:
-        - subnet: 172.18.0.0/16
+        - subnet: 172.30.0.0/16

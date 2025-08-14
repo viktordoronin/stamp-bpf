@@ -22,13 +22,14 @@ func main(){
 	// TODO: arg checking and error handling
 	// should probably return some sort of struct with processed opts
 	args:=cli.ParseSenderArgs()
-	
+
+	// TODO: this too can be probably done inside the CLI package
 	// check privileges before we do anything else
 	if err:=privileges.Check(args.Src); err!=nil{
 		log.Fatalf("Error checking privileges: %s",err)
 	}
 
-	// TODO: this is checked by cli
+	// TODO: this should be checked by cli
 	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
 	iface, err := net.InterfaceByName(args.Dev)
 	if err!=nil{
@@ -55,7 +56,6 @@ func main(){
 	go stamp.UpdateAndPrint()
 	
 	// this hangs up the program without destroying your CPU
-	// TODO: errgroups
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 	<-stopper

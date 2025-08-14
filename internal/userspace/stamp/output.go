@@ -16,20 +16,24 @@ var output chan metrics.Sample = make(chan metrics.Sample)
 
 // TODO: output interval shouldn't be tied to packet sending interval: implement bulk sample reading
 
-func ReadAndParse(rd *ringbuf.Reader, interval time.Duration){
+func ReadAndParse(rd *ringbuf.Reader, interval time.Duration) error {
 	//this ticks twice as fast to account for the fact that this can start earlier than the actual packet arrives
 	//they won't go out of sync either way but this should feel more responsive for longer intervals
+	//shorter intervals will look bad tho, which is why we shouldn't do it this way
 	ticker:=time.NewTicker(interval/2)
 	var timestamp sender.SenderPacketTs
 	// TODO: this needs to loop only until we've read <num> packets; implement after packet loss
 	for{
 		record, err:=rd.Read()
+		if err!=nil{
+			log.Fatalf("Error reading ringbuf:%v",err)
+		}
 		// this fires when we read a record
 		// TODO: account for actual read errors aside from pipe empty
 		if err==nil{
 			//read a record
 			if err:=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &timestamp); err!=nil {
-				log.Fatalf("Parsing ringbuf record: %v",err)
+				return fmt.Errorf("Parsing ringbuf record: %v",err)
 			}
 		}
 		output <- metrics.NewSample(&timestamp)
@@ -40,6 +44,7 @@ func ReadAndParse(rd *ringbuf.Reader, interval time.Duration){
 func UpdateAndPrint(){
 	m:=metrics.NewCollection()
 	// this needs to be >= max length of an output line
+	// TODO: replace with trailing whitespaces on the actual lines
 	empty:=bytes.Repeat([]byte(" "),96)
 	// make space for the output
 	fmt.Printf("\n\n\n\n")
