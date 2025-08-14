@@ -17,7 +17,6 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/privileges"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
 )
-
 func main(){
 	// TODO: arg checking and error handling
 	// should probably return some sort of struct with processed opts

@@ -14,6 +14,10 @@ services:
       stamp-bpf:
         ipv4_address: 172.30.0.3
         interface_name: eth0
+    volumes:
+      - type: bind
+        source: ../cmd/bin
+        target: /home/bin
         
   sender:
     container_name: stamp_sender
@@ -31,7 +35,11 @@ services:
       stamp-bpf:
         ipv4_address: 172.30.0.2
         interface_name: eth0
-            
+    volumes:
+      - type: bind
+        source: ../cmd/bin
+        target: /home/bin
+        
 networks:
   stamp-bpf:
     driver: bridge
