@@ -1,6 +1,24 @@
 # STAMP implementation for Go
 This is a STAMP Protocol(RFC 8762) implementation using Go and eBPF. Implemented so far: stateless unauthenticated STAMP sessions(both sender and reflector). It's a rough but functional implementation so far.
 
+# Demo instructions
+Once you unzip the archive, you can run `demo.sh` for a quick and easy Docker-based local demo. You should see ~50ms near-end delay and ~100ms far-end delay.
+
+You're also provided binaries for testing over live network. They're statically linked and should require no dependencies, but they require 6.6 Kernel and either root or [linux capabilities](#caps).
+
+`reflector` takes interface name, attaches to that interface and listens(not really since it's a BPF filter) on port 862:
+```
+sudo reflector eth0
+```
+`reflector` can handle several sessions at once and doesn't keep track of individual sessions (stateful mode) at this time. 
+**IMPORTANT**: `reflector` needs to remain running in order for the program to function; use `&` if you'll need to use the same shell! 
+
+`sender` takes interface name and IP, attaches the BPF components to provided interface and starts sending packets to that IP to and from port 862:
+```
+sudo sender eth0 111.222.33.44
+```
+There are `ping`-like options for packet count(`-c`) and send interval(`-i`) (**WARNING: might be unstable**). You'll have to quit this program with `Ctrl+C` when it's done. It only does one STAMP session at a time. 
+
 # TODO (in this order(more or less))
 - Introduce config maps:
   - Sender: specify target IP(as opposed to hardcoded)

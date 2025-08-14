@@ -19,7 +19,14 @@ demo: binaries clean
 	docker exec -d stamp_reflector /home/bin/reflector eth0
 	docker exec stamp_sender /home/bin/sender eth0 172.30.0.3 -c 10
 	docker compose -f ./docker/demo/compose.yaml down -t0
-.PHONY: demo teststand
+.PHONY: demo teststand releasedemo
+
+releasedemo: binaries
+	rm -f ./release/demo/sender ./release/demo/reflector ./release/demo/demo.zip
+	cp ./cmd/bin/* ./release/demo
+	docker compose -f ./release/demo/compose.yaml build
+	docker save stampdemo > ./release/demo/image.gz
+	zip -j ./release/demo/demo ./release/demo/*
 
 clean:
 	docker compose -f ./docker/demo/compose.yaml down -t0

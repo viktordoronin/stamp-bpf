@@ -1,4 +1,3 @@
-
 services:      
   reflector:
     container_name: stamp_reflector
