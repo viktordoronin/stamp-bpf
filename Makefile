@@ -9,8 +9,7 @@ cmd/bin/sender: cmd/sender/sender.go internal/bpf/sender/* internal/userspace/*/
 cmd/bin/reflector: cmd/reflector/reflector.go internal/bpf/reflector/* internal/userspace/*/* 
 	CGO_ENABLED=0 go build -C ./cmd/reflector -o ../bin/
 
-# FIXME
-internal/bpf/sender/sender_x86_bpfel.go internal/bpf/reflector/reflector_x86_bpfel.go &: internal/bpf/*
+internal/bpf/sender/sender_x86_bpfel.go internal/bpf/reflector/reflector_x86_bpfel.go &: internal/bpf/reflector.bpf.c internal/bpf/sender.bpf.c internal/bpf/stamp.bpf.h
 	go generate ./internal/bpf
 
 demo: binaries clean

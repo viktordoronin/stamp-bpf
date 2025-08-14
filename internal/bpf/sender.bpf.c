@@ -1,5 +1,4 @@
 //go:build ignore
-
 #include "stamp.bpf.h"
 
 #include <stdint.h>
