@@ -16,6 +16,7 @@ type senderArgs struct {
 	Dest uint16 `arg:"-d" default:"862"`
 	Count uint32 `arg:"-c,--" default:"0"`
 	Interval float64 `arg:"-i,--" default:"1"`
+	Debug bool 
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -55,6 +56,7 @@ func ParseSenderArgs() stamp.Args {
 	} else { res.Interval=time.Millisecond*time.Duration(args.Interval*1000) }
 	
 	res.Count=args.Count
+	res.Debug=args.Debug
 	
 	return res
 }
@@ -62,6 +64,7 @@ func ParseSenderArgs() stamp.Args {
 type reflectorArgs struct {
 	Dev string `arg:"positional,required"`
 	Src uint16 `arg:"-s" default:"862"`
+	Debug bool
 }
 
 func ParseReflectorArgs() stamp.Args {
@@ -87,6 +90,7 @@ func ParseReflectorArgs() stamp.Args {
 	}
 
 	res.S_port=int(args.Src)
+	res.Debug=args.Debug
 
 	return res	
 }

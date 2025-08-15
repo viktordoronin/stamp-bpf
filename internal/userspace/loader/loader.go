@@ -49,10 +49,12 @@ func LoadSender(args stamp.Args) senderFD{
 			log.Fatalf("Verifier error: %+v\n", verr) 
 		}
 		log.Fatalf("Error loading programs: %v",err)
-		} else {
-		log.Print("All programs successfully loaded and verified")
-		log.Print(objs.SenderOut.VerifierLog)
-		log.Print(objs.SenderIn.VerifierLog)
+	} else {
+		if args.Debug==true {
+			log.Print("All programs successfully loaded and verified")
+			log.Print(objs.SenderOut.VerifierLog)
+			log.Print(objs.SenderIn.VerifierLog)
+		}
 	}
 	
 	// Attach TCX programs
@@ -93,12 +95,14 @@ func LoadReflector(args stamp.Args) reflectorFD{
 			log.Fatalf("Verifier error: %+v\n", verr) 
 		}
 		log.Fatalf("Error loading programs: %v",err)
-		} else {
-		log.Print("All programs successfully loaded and verified")
-		log.Print(objs.ReflectorIn.VerifierLog)
-		log.Print(objs.ReflectorOut.VerifierLog)
+	} else {
+		if args.Debug==true {
+			log.Print("All programs successfully loaded and verified")
+			log.Print(objs.ReflectorIn.VerifierLog)
+			log.Print(objs.ReflectorOut.VerifierLog)
+		}
 	}
-		tcxopts:=link.TCXOptions{
+	tcxopts:=link.TCXOptions{
 		Interface: args.Dev.Index,
 		Program: objs.ReflectorOut,
 		Attach: ebpf.AttachTCXEgress,
@@ -107,7 +111,7 @@ func LoadReflector(args stamp.Args) reflectorFD{
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
-		tcxopts=link.TCXOptions{
+	tcxopts=link.TCXOptions{
 		Interface: args.Dev.Index,
 		Program: objs.ReflectorIn,
 		Attach: ebpf.AttachTCXIngress,

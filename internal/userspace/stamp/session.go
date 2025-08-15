@@ -18,6 +18,7 @@ type Args struct{
 	Interval time.Duration
 	Count uint32
 	OutputMap *ebpf.Map
+	Debug bool
 }
 
 func StartSession(args Args){
