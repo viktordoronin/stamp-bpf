@@ -17,6 +17,8 @@ services:
       - type: bind
         source: ../../cmd/bin
         target: /home/bin
+      - debugfs:/sys/kernel/debug
+
         
   sender:
     container_name: stamp_sender
@@ -38,6 +40,7 @@ services:
       - type: bind
         source: ../../cmd/bin
         target: /home/bin
+      - debugfs:/sys/kernel/debug
         
 networks:
   stamp-bpf:
@@ -45,3 +48,10 @@ networks:
     ipam:
       config:
         - subnet: 172.30.0.0/16
+
+volumes:
+  debugfs:
+    driver: local
+    driver_opts:
+      type: "debugfs"
+      device: "debugfs"

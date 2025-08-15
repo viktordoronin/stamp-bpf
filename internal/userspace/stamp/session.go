@@ -12,6 +12,7 @@ import (
 
 type Args struct{
 	Dev *net.Interface
+	Localaddr net.IP
 	IP net.IP
 	S_port, D_port int
 	Interval time.Duration

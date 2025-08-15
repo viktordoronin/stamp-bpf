@@ -1,14 +1,15 @@
 package loader
 
 import (
+	"encoding/binary"
 	"errors"
 	"log"
-	"net"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/reflector"
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
 )
 
 type fd interface {
@@ -37,7 +38,7 @@ func (s reflectorFD) Close() {
 	s.L_out.Close()
 }
 
-func LoadSender(iface *net.Interface) senderFD{
+func LoadSender(args stamp.Args) senderFD{
 	// Load TCX programs
 	var objs sender.SenderObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
@@ -56,7 +57,7 @@ func LoadSender(iface *net.Interface) senderFD{
 	
 	// Attach TCX programs
 	tcxopts:=link.TCXOptions{
-		Interface: iface.Index,
+		Interface: args.Dev.Index,
 		Program: objs.SenderOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
@@ -65,7 +66,7 @@ func LoadSender(iface *net.Interface) senderFD{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}	
 	tcxopts=link.TCXOptions{
-		Interface: iface.Index,
+		Interface: args.Dev.Index,
 		Program: objs.SenderIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
@@ -73,10 +74,16 @@ func LoadSender(iface *net.Interface) senderFD{
 	if err!=nil{
 		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
+
+	// populate globals
+	ip:=binary.LittleEndian.Uint32(args.Localaddr.To4())
+	objs.Laddr.Set(ip)
+	objs.S_port.Set(uint16(args.S_port))
+	
 	return senderFD{Objs:objs,L_in:l_in,L_out:l_out}
 }
 
-func LoadReflector(iface *net.Interface) reflectorFD{
+func LoadReflector(args stamp.Args) reflectorFD{
 	var objs reflector.ReflectorObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
 	err := reflector.LoadReflectorObjects(&objs, &opts)
@@ -92,7 +99,7 @@ func LoadReflector(iface *net.Interface) reflectorFD{
 		log.Print(objs.ReflectorOut.VerifierLog)
 	}
 		tcxopts:=link.TCXOptions{
-		Interface: iface.Index,
+		Interface: args.Dev.Index,
 		Program: objs.ReflectorOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
@@ -101,7 +108,7 @@ func LoadReflector(iface *net.Interface) reflectorFD{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 		tcxopts=link.TCXOptions{
-		Interface: iface.Index,
+		Interface: args.Dev.Index,
 		Program: objs.ReflectorIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
@@ -109,5 +116,11 @@ func LoadReflector(iface *net.Interface) reflectorFD{
 	if err!=nil{
 		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
+
+	// populate globals
+	ip:=binary.LittleEndian.Uint32(args.Localaddr.To4())
+	objs.Laddr.Set(ip)
+	objs.S_port.Set(uint16(args.S_port))
+	
 	return reflectorFD{Objs:objs,L_in:l_in,L_out:l_out}
 }

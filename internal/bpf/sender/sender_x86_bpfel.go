@@ -78,6 +78,8 @@ type SenderMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type SenderVariableSpecs struct {
+	Laddr  *ebpf.VariableSpec `ebpf:"laddr"`
+	S_port *ebpf.VariableSpec `ebpf:"s_port"`
 }
 
 // SenderObjects contains all objects after they have been loaded into the kernel.
@@ -113,6 +115,8 @@ func (m *SenderMaps) Close() error {
 //
 // It can be passed to LoadSenderObjects or ebpf.CollectionSpec.LoadAndAssign.
 type SenderVariables struct {
+	Laddr  *ebpf.Variable `ebpf:"laddr"`
+	S_port *ebpf.Variable `ebpf:"s_port"`
 }
 
 // SenderPrograms contains all programs after they have been loaded into the kernel.

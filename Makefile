@@ -19,7 +19,7 @@ bpf: $(senderskel) $(reflectorskel)
 .PHONY: binaries bpf
 
 $(bindir)/sender: $(sendersrc) $(senderskel) $(golibs)
-	CGO_ENABLED=0 go build -C ./cmd/sender -o ../bin/
+	go build -C ./cmd/sender -o ../bin/
 
 $(bindir)/reflector: $(reflectorsrc) $(reflectorskel) $(golibs)
 	CGO_ENABLED=0 go build -C ./cmd/reflector -o ../bin/
@@ -32,8 +32,8 @@ test: binaries
 	docker compose -f ./docker/testing/compose.yaml up -d -t0
 	docker exec stamp_reflector tc qdisc add dev eth0 root netem delay 100ms 20ms distribution normal
 	docker exec stamp_sender tc qdisc add dev eth0 root netem delay 50ms 10ms distribution normal
-	docker exec -d stamp_reflector /home/bin/reflector eth0
-	docker exec stamp_sender /home/bin/sender eth0 172.30.0.3 -i 0.1 -c 0 -s 862 -d 862
+	docker exec -d stamp_reflector /home/bin/reflector eth0 
+	docker exec stamp_sender /home/bin/sender eth0 172.30.0.3 -i 0.5 -c 0 -s 1000 
 	docker compose -f ./docker/testing/compose.yaml down -t0
 
 demo: binaries

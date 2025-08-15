@@ -8,7 +8,19 @@
 #include <linux/udp.h>
 #include <linux/ip.h>
 #include <linux/in.h>
+#include <bpf/bpf_core_read.h>
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
 
+// global vars for for-me check
+volatile uint32_t laddr;
+volatile uint16_t s_port;
+
+enum forme_dir {
+  FORME_OUTBOUND,
+  FORME_INBOUND,
+};
+  
 struct senderpkt; //proto
 
 struct ntp_ts{
@@ -61,9 +73,7 @@ uint64_t untimestamp(struct ntp_ts *arg){
 /* } */
 
 // for me check, DONE BEFORE ANY MODIFICATION OF THE PACKET, usage: if (!for_me(skb)) return TCX_PASS;
-// TODO: check source/dest IP and ports against local(global var)
-// I might want to add an enum to differentiate between reflector check and sender check
-uint32_t for_me(struct __sk_buff *skb){
+uint32_t for_me(struct __sk_buff *skb, enum forme_dir dir){
   //TCX_PASS evaluates to 0 so we can use this as a simple true-false function
   //grab the actual packet
   void *data = (void *)(long)skb->data;
@@ -79,12 +89,17 @@ uint32_t for_me(struct __sk_buff *skb){
   if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
   //Is it UDP?
   if (iph->protocol!=IPPROTO_UDP) return TCX_PASS;
+  //Is it for us? If it's inbound then we check dest IP, if outbound we check source IP
+  // surprisingly, IPs are stored in LE
+  if (dir == FORME_INBOUND && iph->daddr!=laddr) return TCX_PASS;
+  if (dir == FORME_OUTBOUND && iph->saddr!=laddr) return TCX_PASS;
   //UDP header
   struct udphdr *udph = data + sizeof(struct iphdr)+sizeof(struct ethhdr);
   if (data + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
-  //862 is a well-known TWAMP port
-  //we'll need some communication mechanism for custom ports
-  if (udph->dest!=bpf_ntohs(862) || udph->source!=bpf_ntohs(862)) return TCX_PASS;
+  // Is it for our port?
+  if (dir == FORME_INBOUND && udph->dest!=bpf_ntohs(s_port)) return TCX_PASS;
+  if (dir == FORME_OUTBOUND && udph->source!=bpf_ntohs(s_port)) return TCX_PASS;
+  
   return 1;
 }
 
@@ -114,7 +129,6 @@ uint64_t pkt_turnaround(struct __sk_buff *skb){
   data_end = (void *)(long)skb->data_end;
   struct udphdr *udph=data+sizeof(struct ethhdr)+sizeof(struct iphdr);
   if(data+sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) > data_end) return TCX_PASS;
-  // TODO: make sure this works correctly
   if (udph->source != udph->dest) {
   uint16_t src_port=udph->source;
   uint16_t dest_port=udph->dest;

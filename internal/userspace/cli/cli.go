@@ -15,7 +15,7 @@ type senderArgs struct {
 	Src uint16 `arg:"-s" default:"862"`
 	Dest uint16 `arg:"-d" default:"862"`
 	Count uint32 `arg:"-c,--" default:"0"`
-	Interval float64 `arg:"-i,--" default:"1000"`
+	Interval float64 `arg:"-i,--" default:"1"`
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -30,9 +30,16 @@ func ParseSenderArgs() stamp.Args {
 
 	// grab interface
 	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
-	if iface, err := net.InterfaceByName(args.Dev); err!=nil{
+	if iface, err := net.InterfaceByName(args.Dev); err!=nil {
 		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
-	}	else { res.Dev=iface }
+	} else { res.Dev=iface }
+	
+	// grab local IP
+	addrs,err:=res.Dev.Addrs()
+	res.Localaddr,_,err=net.ParseCIDR(addrs[0].String())
+	if res.Localaddr==nil || err != nil {
+		parser.Fail(fmt.Sprintf("Failed to fetch local IP: %v", err))
+	}
 
 	// parse IP
 	if parsedIP:=net.ParseIP(args.IP); parsedIP==nil {
@@ -54,7 +61,7 @@ func ParseSenderArgs() stamp.Args {
 
 type reflectorArgs struct {
 	Dev string `arg:"positional,required"`
-	Src int `arg:"-s" default:"862"`
+	Src uint16 `arg:"-s" default:"862"`
 }
 
 func ParseReflectorArgs() stamp.Args {
@@ -65,12 +72,19 @@ func ParseReflectorArgs() stamp.Args {
 	// check privileges before we do anything else
 	if err:=CheckPrivileges(int(args.Src)); err!=nil{
 		parser.Fail(fmt.Sprint(err))
-	}
-
+	}	
+	
 	// grab interface
-	if iface, err := net.InterfaceByName(args.Dev); err!=nil{
+	if iface, err := net.InterfaceByName(args.Dev);err!=nil{
 		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
-	}	else { res.Dev=iface }
+	} else {res.Dev=iface}
+
+	// grab local IP
+	addrs,err:=res.Dev.Addrs()
+	res.Localaddr,_,err=net.ParseCIDR(addrs[0].String())
+	if res.Localaddr==nil || err != nil {
+		parser.Fail(fmt.Sprintf("Failed to fetch local IP: %v", err))
+	}
 
 	res.S_port=int(args.Src)
 

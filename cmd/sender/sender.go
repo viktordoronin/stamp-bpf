@@ -16,7 +16,7 @@ func main(){
 	args:=cli.ParseSenderArgs()
 
 	// Load the compiled eBPF ELF and load it into the kernel
-	bpf:=loader.LoadSender(args.Dev)
+	bpf:=loader.LoadSender(args)
 	args.OutputMap=bpf.Objs.Output
 	defer bpf.Close()
 

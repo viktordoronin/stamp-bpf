@@ -19,7 +19,7 @@ func main(){
 	args:=cli.ParseReflectorArgs()
 	
 	// Load the compiled eBPF ELF and load it into the kernel.
-	bpf:=loader.LoadReflector(args.Dev)
+	bpf:=loader.LoadReflector(args)
 	defer bpf.Close()
 	
 	// hang up

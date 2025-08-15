@@ -15,12 +15,8 @@ type senderpacket struct{
 	MBZ [32]byte
 }
 
-func dialReflector(iface *net.Interface, addr net.IP, s_port, d_port int) (*net.UDPConn, error) {
-	addrs,err:=iface.Addrs()
-	if err!=nil {
-		return nil, fmt.Errorf("Error fetching local address of interface %s: %w",iface.Name,err)
-	}
-	localaddr:=net.UDPAddr{IP:net.ParseIP(addrs[0].String()),	Port: s_port}
+func dialReflector(laddr, addr net.IP, s_port, d_port int) (*net.UDPConn, error) {
+	localaddr:=net.UDPAddr{IP:laddr,	Port: s_port}
 	var remoteaddr net.UDPAddr
 	remoteaddr=net.UDPAddr{IP: addr, Port: d_port}
 	conn, err:=net.DialUDP("udp",&localaddr,&remoteaddr)
@@ -32,7 +28,7 @@ func dialReflector(iface *net.Interface, addr net.IP, s_port, d_port int) (*net.
 
 func send(ctx context.Context, args Args) error {
 	//setup
-	conn, err:=dialReflector(args.Dev, args.IP, args.S_port, args.D_port)
+	conn, err:=dialReflector(args.Localaddr, args.IP, args.S_port, args.D_port)
 	if err!=nil{
 		return fmt.Errorf("Error dialing reflector: %w",err)
 	}

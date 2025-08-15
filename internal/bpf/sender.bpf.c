@@ -37,7 +37,7 @@ int sender_out(struct __sk_buff *skb){
   //RETURN VALUE: ALWAYS TCX_PASS
 
   //for-me check
-  if ( ! for_me(skb) ) return TCX_PASS;
+  if ( ! for_me(skb, FORME_OUTBOUND) ) return TCX_PASS;
   
   // T1
   uint32_t offset=stampoffset(offsetof(struct senderpkt, t1_s));
@@ -56,7 +56,7 @@ int sender_in(struct __sk_buff *skb){
   uint64_t last_ts = bpf_ktime_get_tai_ns();
 
   //for-me check
-  if (!for_me(skb)) return TCX_PASS;
+  if (!for_me(skb, FORME_INBOUND)) return TCX_PASS;
   
   // grab the actual packet
   void *data = (void *)(long)skb->data;

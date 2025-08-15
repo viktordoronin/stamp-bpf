@@ -23,7 +23,7 @@ int reflector_in(struct __sk_buff *skb){
   timestamp(&rec_ts);
 
   //for-me check
-  if (!for_me(skb)) return TCX_PASS;
+  if (!for_me(skb, FORME_INBOUND)) return TCX_PASS;
   
   //grab the actual packet
   void *data = (void *)(long)skb->data;
@@ -75,7 +75,7 @@ int reflector_out(struct __sk_buff *skb){
   //light work - stamp a packet and send it on its way
 
   //for-me check
-  if (!for_me(skb)) return TCX_PASS;
+  if (!for_me(skb, FORME_OUTBOUND)) return TCX_PASS;
 
   //grab the actual packet
   void *data = (void *)(long)skb->data;

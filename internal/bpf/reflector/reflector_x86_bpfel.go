@@ -68,6 +68,8 @@ type ReflectorMapSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type ReflectorVariableSpecs struct {
+	Laddr  *ebpf.VariableSpec `ebpf:"laddr"`
+	S_port *ebpf.VariableSpec `ebpf:"s_port"`
 }
 
 // ReflectorObjects contains all objects after they have been loaded into the kernel.
@@ -100,6 +102,8 @@ func (m *ReflectorMaps) Close() error {
 //
 // It can be passed to LoadReflectorObjects or ebpf.CollectionSpec.LoadAndAssign.
 type ReflectorVariables struct {
+	Laddr  *ebpf.Variable `ebpf:"laddr"`
+	S_port *ebpf.Variable `ebpf:"s_port"`
 }
 
 // ReflectorPrograms contains all programs after they have been loaded into the kernel.
