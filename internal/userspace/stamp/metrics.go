@@ -1,7 +1,6 @@
 package stamp
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -34,31 +33,30 @@ func newSample(s *sender.SenderSample) sample{
 // Metrics are network performance stats derived from latency
 type stampMetrics struct {
 	Min,Max,Avg,Jitter,Last float64
+	jitterAbs float64
 }
 func newMetricsRecord() stampMetrics{
 	//we need to set this to maximum or else it will remain 0 forever
 	return stampMetrics{Min: math.MaxFloat64}
 }
 // we update our Metrics with each new Sample
-func (metrics *stampMetrics) updateMetrics(sample float64){
-	metrics.Last=sample
-	metrics.Min=math.Min(metrics.Min,sample)
-	metrics.Max=math.Max(metrics.Max,sample)
+func (m *stampMetrics) updateMetrics(sample float64){
+	m.Last=sample
+	m.Min=math.Min(m.Min,sample)
+	m.Max=math.Max(m.Max,sample)
 	// math: suppose we got an average of 2 packets so far: avg=(x+y)/2
 	// in order to dynamically recalculate average accounting for packet z, we have to reclaim original sum: sum=avg*2
 	// add the new sample and get the new average: (sum+z)/3
 	// full formula: avg=(oldavg*(pkts-1)+newpkt)/pkts
-	metrics.Avg=(metrics.Avg*(float64(pktCount)-1)+sample)/float64(pktCount)
+	m.Avg=(m.Avg*(float64(pktCount)-1)+sample)/float64(pktCount)
 	// we define jitter as average deviation from the average ping, expressed in percent
 	// no I don't know whether it makes sense or is even calculated correctly
-	// FIXME
-	jit:=math.Abs(metrics.Avg-sample)
-	jit=(jit*(float64(pktCount)-1)+sample)/float64(pktCount)
-	metrics.Jitter=jit/(metrics.Avg/100)
+	diff:=math.Abs(m.Avg-sample)	
+	m.jitterAbs=(m.jitterAbs*(float64(pktCount)-1)+diff)/float64(pktCount)
+	m.Jitter=m.jitterAbs/(m.Avg/100)
 }
 func (m *stampMetrics) String() string{
-	empty:=bytes.Repeat([]byte(" "),16)
-	return fmt.Sprintf("min %7.3fms max %7.3fms avg %7.3fms last %7.3fms jitter %6.2f%%%s",m.Min,m.Max,m.Avg,m.Last,m.Jitter,empty)
+	return fmt.Sprintf("min %7.3fms max %7.3fms avg %7.3fms last %7.3fms jitter %6.2f%%",m.Min,m.Max,m.Avg,m.Last,m.Jitter)
 }
 
 // MetricsCollection contains Metrics for each of the three directions(inbound, outbound, roundtrip)
