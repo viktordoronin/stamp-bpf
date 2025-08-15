@@ -1,4 +1,6 @@
 test/*
-*.out
 cmd/bin/*
-release/*
+docker/demo/demo.zip
+docker/demo/image.gz
+docker/demo/reflector
+docker/demo/sender

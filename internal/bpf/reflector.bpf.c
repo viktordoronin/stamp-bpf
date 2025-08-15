@@ -1,7 +1,6 @@
 //go:build ignore
 
 #include "stamp.bpf.h"
-
 #include <stdint.h>
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>

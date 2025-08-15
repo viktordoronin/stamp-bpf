@@ -14,7 +14,7 @@ import (
 func main(){
 	//parse and validate args, get a struct with the stuff we will need
 	args:=cli.ParseSenderArgs()
-	
+
 	// Load the compiled eBPF ELF and load it into the kernel
 	bpf:=loader.LoadSender(args.Dev)
 	args.OutputMap=bpf.Objs.Output
@@ -22,7 +22,7 @@ func main(){
 
 	// start the STAMP session, all gofuncs are managed in this func
 	stamp.StartSession(args)
-	stamp.
+	
 	// TODO: I won't need this as soon as I get the output to exit properly
 	// this hangs up the program without destroying your CPU
 	stopper := make(chan os.Signal, 1)

@@ -22,6 +22,7 @@ func ParseSenderArgs() stamp.Args {
 	var args senderArgs
 	var res stamp.Args
 	parser:=arg.MustParse(&args)
+	
 	// check privileges before we do anything else
 	if err:=CheckPrivileges(int(args.Src)); err!=nil{
 		parser.Fail(fmt.Sprint(err))
@@ -53,8 +54,22 @@ type reflectorArgs struct {
 	Src int `arg:"-s" default:"862"`
 }
 
-func ParseReflectorArgs() reflectorArgs {
+func ParseReflectorArgs() stamp.Args {
 	var args reflectorArgs
-	arg.MustParse(&args)
-	return args
+	var res stamp.Args
+	parser:=arg.MustParse(&args)
+	
+	// check privileges before we do anything else
+	if err:=CheckPrivileges(int(args.Src)); err!=nil{
+		parser.Fail(fmt.Sprint(err))
+	}
+
+	// grab interface
+	if iface, err := net.InterfaceByName(args.Dev); err!=nil{
+		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
+	}	else { res.Dev=iface }
+
+	res.S_port=int(args.Src)
+
+	return res	
 }

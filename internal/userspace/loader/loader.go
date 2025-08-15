@@ -11,7 +11,7 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
-type FD interface {
+type fd interface {
 	Close() error
 }
 
@@ -39,9 +39,9 @@ func (s reflectorFD) Close() {
 
 func LoadSender(iface *net.Interface) senderFD{
 	// Load TCX programs
-	var Objs sender.SenderObjects
+	var objs sender.SenderObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
-	err := sender.LoadSenderObjects(&Objs, &opts)
+	err := sender.LoadSenderObjects(&objs, &opts)
 	if err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
@@ -50,35 +50,36 @@ func LoadSender(iface *net.Interface) senderFD{
 		log.Fatalf("Error loading programs: %v",err)
 		} else {
 		log.Print("All programs successfully loaded and verified")
-		log.Print(Objs.SenderOut.VerifierLog)
-		log.Print(Objs.SenderIn.VerifierLog)
+		log.Print(objs.SenderOut.VerifierLog)
+		log.Print(objs.SenderIn.VerifierLog)
 	}
 	
 	// Attach TCX programs
 	tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
-		Program: Objs.SenderOut,
+		Program: objs.SenderOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
-	L_out,err:=link.AttachTCX(tcxopts)
+	l_out,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}	
 	tcxopts=link.TCXOptions{
 		Interface: iface.Index,
-		Program: Objs.SenderIn,
+		Program: objs.SenderIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
-	L_in,err:=link.AttachTCX(tcxopts)
+	l_in,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
-	return senderFD{Objs:Objs,L_in:L_in,L_out:L_out}
+	return senderFD{Objs:objs,L_in:l_in,L_out:l_out}
 }
 
-func LoadReflector(Objs *reflector.ReflectorObjects,L_out, L_in *link.Link, iface *net.Interface){
+func LoadReflector(iface *net.Interface) reflectorFD{
+	var objs reflector.ReflectorObjects
 	var opts = ebpf.CollectionOptions{Programs:ebpf.ProgramOptions{LogLevel:1}}
-	err := reflector.LoadReflectorObjects(Objs, &opts)
+	err := reflector.LoadReflectorObjects(&objs, &opts)
 	if err != nil {
 		var verr *ebpf.VerifierError
 		if errors.As(err, &verr) {
@@ -87,25 +88,26 @@ func LoadReflector(Objs *reflector.ReflectorObjects,L_out, L_in *link.Link, ifac
 		log.Fatalf("Error loading programs: %v",err)
 		} else {
 		log.Print("All programs successfully loaded and verified")
-		log.Print(Objs.ReflectorIn.VerifierLog)
-		log.Print(Objs.ReflectorOut.VerifierLog)
+		log.Print(objs.ReflectorIn.VerifierLog)
+		log.Print(objs.ReflectorOut.VerifierLog)
 	}
 		tcxopts:=link.TCXOptions{
 		Interface: iface.Index,
-		Program: Objs.ReflectorOut,
+		Program: objs.ReflectorOut,
 		Attach: ebpf.AttachTCXEgress,
 	}
-	*L_out,err=link.AttachTCX(tcxopts)
+	l_out,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the egress program: %v",err)
 	}
 		tcxopts=link.TCXOptions{
 		Interface: iface.Index,
-		Program: Objs.ReflectorIn,
+		Program: objs.ReflectorIn,
 		Attach: ebpf.AttachTCXIngress,
 	}
-	*L_in,err=link.AttachTCX(tcxopts)
+	l_in,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
 		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
+	return reflectorFD{Objs:objs,L_in:l_in,L_out:l_out}
 }

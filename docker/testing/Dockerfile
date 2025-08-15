@@ -4,5 +4,4 @@ RUN <<EOL
     apt -y update
     apt -y install iproute2 iputils-ping
 EOL
-COPY ./reflector ./sender /home/
 ENTRYPOINT tail -F /dev/null

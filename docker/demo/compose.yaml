@@ -1,47 +1,40 @@
+
 services:      
   reflector:
-    container_name: stamp_reflector
+    container_name: stamp_reflector_demo
     cap_add:
       - BPF
       - NET_ADMIN
       - NET_BIND_SERVICE
     build:
-      context: ../../
-      dockerfile: ./docker/demo/Dockerfile
-    image: stamptest
+      context: .
+      dockerfile: ./Dockerfile
+    image: stampdemo
     networks:
-      stamp-bpf:
-        ipv4_address: 172.30.0.3
+      stamp-bpf-demo:
+        ipv4_address: 172.31.0.3
         interface_name: eth0
-    volumes:
-      - type: bind
-        source: ../../cmd/bin
-        target: /home/bin
         
   sender:
-    container_name: stamp_sender
+    container_name: stamp_sender_demo
     cap_add:
       - BPF
       - NET_ADMIN
       - NET_BIND_SERVICE
     build:
-      context: ../../
-      dockerfile: ./docker/demo/Dockerfile
-    image: stamptest
+      context: .
+      dockerfile: ./Dockerfile
+    image: stampdemo
     depends_on:
       - reflector
     networks:
-      stamp-bpf:
-        ipv4_address: 172.30.0.2
+      stamp-bpf-demo:
+        ipv4_address: 172.31.0.2
         interface_name: eth0
-    volumes:
-      - type: bind
-        source: ../../cmd/bin
-        target: /home/bin
         
 networks:
-  stamp-bpf:
+  stamp-bpf-demo:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.30.0.0/16
+        - subnet: 172.31.0.0/16
