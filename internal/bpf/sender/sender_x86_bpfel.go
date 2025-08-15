@@ -13,10 +13,12 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type SenderPacketTs struct {
-	_   structs.HostLayout
-	Seq uint32
-	Ts  [4]uint64
+type SenderSample struct {
+	_    structs.HostLayout
+	Seq  uint32
+	Near uint64
+	Far  uint64
+	Rt   uint64
 }
 
 // LoadSender returns the embedded CollectionSpec for Sender.

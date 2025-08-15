@@ -37,7 +37,6 @@ func (s reflectorFD) Close() {
 	s.L_out.Close()
 }
 
-// TODO: error handling
 func LoadSender(iface *net.Interface) senderFD{
 	// Load TCX programs
 	var Objs sender.SenderObjects
@@ -72,7 +71,7 @@ func LoadSender(iface *net.Interface) senderFD{
 	}
 	L_in,err:=link.AttachTCX(tcxopts)
 	if err!=nil{
-		log.Fatalf("Error attaching the egress program: %v",err)
+		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
 	return senderFD{Objs:Objs,L_in:L_in,L_out:L_out}
 }
@@ -107,6 +106,6 @@ func LoadReflector(Objs *reflector.ReflectorObjects,L_out, L_in *link.Link, ifac
 	}
 	*L_in,err=link.AttachTCX(tcxopts)
 	if err!=nil{
-		log.Fatalf("Error attaching the egress program: %v",err)
+		log.Fatalf("Error attaching the ingress program: %v",err)
 	}
 }

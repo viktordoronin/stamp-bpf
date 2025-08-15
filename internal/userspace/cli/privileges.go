@@ -1,4 +1,4 @@
-package privileges
+package cli
 
 import(
 	"os/user"
@@ -49,11 +49,11 @@ func checkSu() error {
 }
 
 // User-facing function, fails if both checks fail
-func Check(port int) error {
+func CheckPrivileges(port int) error {
 	err1:=checkCaps(port)
 	err2:=checkSu()
 	if err1!=nil && err2!=nil {
-		return fmt.Errorf("Privilege check failed, errors: \n%w \n%w\n(you need either, not both)",err1,err2)
+		return fmt.Errorf("Privilege check failed: %w %w (you need either, not both)",err1,err2)
 	}
 	return nil
 }

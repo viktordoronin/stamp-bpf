@@ -16,16 +16,20 @@
 char __license[] SEC("license")="GPL";
 
 //parsed packet's timestamps
-struct packet_ts{
-  uint32_t seq;
-  uint64_t ts[4]; //0-1 are outbound journey, 2-3 are inbound
-}__attribute__((packed));
+/* struct packet_ts{ */
+/*   uint64_t ts[4]; //0-1 are outbound journey, 2-3 are inbound */
+/* }__attribute__((packed)); */
 
+struct sample{
+  uint32_t seq;
+  uint64_t near,far,rt;
+}__attribute__((packed));
+  
 //packet info - for output
 struct {
   __uint(type, BPF_MAP_TYPE_RINGBUF);
   __uint(max_entries, 4096);
-  __type(value, struct packet_ts);
+  __type(value, struct sample);
 } output SEC(".maps");
 
 SEC("tcx/egress")
@@ -63,25 +67,31 @@ int sender_in(struct __sk_buff *skb){
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
     return TCX_PASS;
   
-  struct packet_ts timestamps;
+  /* struct packet_ts timestamps; */
+  uint64_t timestamps[4];
+  struct sample s;
   struct ntp_ts ntpts;
   //grab seq
-  timestamps.seq=bpf_ntohl(rf->seq);
+  s.seq=bpf_ntohl(rf->seq);
   //grab sender timestamp
   ntpts.ntp_secs=rf->t1_s;
   ntpts.ntp_fracs=rf->t1_f;
-  timestamps.ts[0]=untimestamp(&ntpts);
+  timestamps[0]=untimestamp(&ntpts);
   //grab reflector stamps
   ntpts.ntp_secs=rf->t2_s;
   ntpts.ntp_fracs=rf->t2_f;
-  timestamps.ts[1]=untimestamp(&ntpts);
+  timestamps[1]=untimestamp(&ntpts);
   ntpts.ntp_secs=rf->t3_s;
   ntpts.ntp_fracs=rf->t3_f;
-  timestamps.ts[2]=untimestamp(&ntpts);
+  timestamps[2]=untimestamp(&ntpts);
   //save the last one we saved earlier
-  timestamps.ts[3]=last_ts;
+  timestamps[3]=last_ts;
+  //calculate samples
+  s.near=timestamps[1]-timestamps[0];
+  s.far=timestamps[3]-timestamps[2];
+  s.rt=timestamps[3]-timestamps[0];
   //send it
-  bpf_ringbuf_output(&output, &timestamps, sizeof(struct packet_ts), 0);
+  bpf_ringbuf_output(&output, &s, sizeof(struct sample), 0);
    
   //We're done with the packet:
   return TCX_DROP; 

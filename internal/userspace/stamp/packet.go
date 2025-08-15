@@ -1,8 +1,9 @@
 package stamp
 
 import (
+	"context"
 	"encoding/binary"
-	"log"
+	"fmt"
 	"net"
 	"time"
 )
@@ -14,43 +15,43 @@ type senderpacket struct{
 	MBZ [32]byte
 }
 
-// TODO: implement errors
-func dialReflector(iface *net.Interface, destaddr string) *net.UDPConn {
-	addrs,_:=iface.Addrs()	
-	localaddr:=net.UDPAddr{
-		IP:net.ParseIP(addrs[0].String()),
-		Port: 862,
+func dialReflector(iface *net.Interface, addr net.IP, s_port, d_port int) (*net.UDPConn, error) {
+	addrs,err:=iface.Addrs()
+	if err!=nil {
+		return nil, fmt.Errorf("Error fetching local address of interface %s: %w",iface.Name,err)
 	}
+	localaddr:=net.UDPAddr{IP:net.ParseIP(addrs[0].String()),	Port: s_port}
 	var remoteaddr net.UDPAddr
-	// TODO: I should check for this when I parse args and pass net.IP instead of the string
-	if destparsed:=net.ParseIP(destaddr); destparsed!=nil{
-		remoteaddr=net.UDPAddr{
-			IP: destparsed,
-			Port: 862,
-		}
-	} else {
-		log.Fatalf("Error parsing IP: %s",destaddr)
-	}
+	remoteaddr=net.UDPAddr{IP: addr, Port: d_port}
 	conn, err:=net.DialUDP("udp",&localaddr,&remoteaddr)
 	if err!=nil{
-		log.Fatalf("Error connecting: ",err)
+		return nil, fmt.Errorf("Error connecting: %w",err)
 	}
-	return conn
+	return conn, nil
 }
 
-func StartSession(packet_count uint32, interval time.Duration, iface *net.Interface, addr string) {
+func send(ctx context.Context, args Args) error {
 	//setup
-	conn:=dialReflector(iface, addr)
+	conn, err:=dialReflector(args.Dev, args.IP, args.S_port, args.D_port)
+	if err!=nil{
+		return fmt.Errorf("Error dialing reflector: %w",err)
+	}
 	var seq uint32 = 1
-	ticker:=time.NewTicker(interval)
-	for packet_count >= seq || packet_count==0 {
+	ticker:=time.NewTicker(args.Interval)
+	//send packets
+	for args.Count >= seq || args.Count==0 {
+		select {
+		case <- ctx.Done(): return nil
+		default:
+		}
 		var buff = make([]byte,44)
 		_,err:=binary.Encode(buff,binary.BigEndian,senderpacket{Seq: seq})
 		if err!=nil{
-			log.Fatalf("Encode error:",err)
+			return fmt.Errorf("Encode error: %w",err)
 		}	
 		conn.Write(buff)
 		seq++
 		<- ticker.C
 	}
+	return nil
 }
