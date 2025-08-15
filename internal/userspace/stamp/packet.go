@@ -37,6 +37,7 @@ func send(ctx context.Context, args Args) error {
 		return fmt.Errorf("Error dialing reflector: %w",err)
 	}
 	var seq uint32 = 1
+	var buff = make([]byte,44)
 	ticker:=time.NewTicker(args.Interval)
 	//send packets
 	for args.Count >= seq || args.Count==0 {
@@ -44,7 +45,6 @@ func send(ctx context.Context, args Args) error {
 		case <- ctx.Done(): return nil
 		default:
 		}
-		var buff = make([]byte,44)
 		_,err:=binary.Encode(buff,binary.BigEndian,senderpacket{Seq: seq})
 		if err!=nil{
 			return fmt.Errorf("Encode error: %w",err)

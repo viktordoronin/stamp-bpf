@@ -15,7 +15,7 @@ type senderArgs struct {
 	Src uint16 `arg:"-s" default:"862"`
 	Dest uint16 `arg:"-d" default:"862"`
 	Count uint32 `arg:"-c,--" default:"0"`
-	Interval uint32 `arg:"-i,--" default:"1000"`
+	Interval float64 `arg:"-i,--" default:"1000"`
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -43,7 +43,10 @@ func ParseSenderArgs() stamp.Args {
 	res.S_port=int(args.Src)
 	res.D_port=int(args.Dest)
 
-	res.Interval=time.Millisecond*time.Duration(args.Interval)
+	if args.Interval<=0 {
+		parser.Fail(fmt.Sprintf("Interval has to be positive"))
+	} else { res.Interval=time.Millisecond*time.Duration(args.Interval*1000) }
+	
 	res.Count=args.Count
 	
 	return res
