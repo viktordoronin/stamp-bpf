@@ -12,8 +12,7 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
-// TODO: output interval shouldn't be tied to packet sending interval: implement bulk sample reading
-func output(ctx context.Context, output *ebpf.Map, interval time.Duration) error {
+func output(ctx context.Context, output *ebpf.Map, interval time.Duration, count uint32) error {
 	rd, err := ringbuf.NewReader(output)
 	if err != nil {
 		return fmt.Errorf("opening ringbuf reader: %w", err)
@@ -26,9 +25,9 @@ func output(ctx context.Context, output *ebpf.Map, interval time.Duration) error
 	//shorter intervals will look bad tho, which is why we shouldn't do it this way
 	ticker:=time.NewTicker(interval/2)
 	var sample sender.SenderSample
-	// TODO: this needs to loop only until we've read <num> packets; implement after packet loss
 	fmt.Printf("\n\n\n\n")
-	for{
+	// FIXME: the loop hangs up when we lose a packet, the total should be updated to make it seem responsive
+	for ( pktCount + pktLost ) < count || count==0 {
 		select {
 		case <- ctx.Done(): return nil
 		default:
@@ -43,12 +42,14 @@ func output(ctx context.Context, output *ebpf.Map, interval time.Duration) error
 			if err=binary.Read(bytes.NewBuffer(record.RawSample),binary.LittleEndian, &sample); err!=nil {
 				return fmt.Errorf("Parsing ringbuf record: %w",err)
 			}
+			if validPacket(sample.Seq) == true {
 			//update metrics
-			met.UpdatemetricsCollection(newSample(&sample))
+				met.UpdatemetricsCollection(newSample(&sample)) }
 		}
 		//this flushes the previous output
 		// print out metrics
 		fmt.Print(met.String())
 		<-ticker.C
 	}
+	return nil
 }

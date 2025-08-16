@@ -16,7 +16,8 @@ type senderArgs struct {
 	Dest uint16 `arg:"-d" default:"862"`
 	Count uint32 `arg:"-c,--" default:"0"`
 	Interval float64 `arg:"-i,--" default:"1"`
-	Debug bool 
+	Debug bool
+	Timeout uint32 `arg:"-w,--" default:"1"`
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -54,6 +55,10 @@ func ParseSenderArgs() stamp.Args {
 	if args.Interval<=0 {
 		parser.Fail(fmt.Sprintf("Interval has to be positive"))
 	} else { res.Interval=time.Millisecond*time.Duration(args.Interval*1000) }
+	
+	if args.Timeout<=0 {
+		parser.Fail(fmt.Sprintf("Timeout has to be positive"))
+	} else { res.Timeout=time.Second*time.Duration(args.Timeout) }
 	
 	res.Count=args.Count
 	res.Debug=args.Debug

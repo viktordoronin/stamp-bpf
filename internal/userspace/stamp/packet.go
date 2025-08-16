@@ -46,6 +46,7 @@ func send(ctx context.Context, args Args) error {
 			return fmt.Errorf("Encode error: %w",err)
 		}	
 		conn.Write(buff)
+		queuePacket(seq,args.Timeout)
 		seq++
 		<- ticker.C
 	}

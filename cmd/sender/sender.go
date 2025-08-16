@@ -3,10 +3,6 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
-
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/cli"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
@@ -22,10 +18,4 @@ func main(){
 
 	// start the STAMP session, all gofuncs are managed in this func
 	stamp.StartSession(args)
-	
-	// TODO: I won't need this as soon as I get the output to exit properly
-	// this hangs up the program without destroying your CPU
-	stopper := make(chan os.Signal, 1)
-	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
-	<-stopper
 }
