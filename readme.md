@@ -44,4 +44,19 @@ There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If
 STAMP is a network performance measurement protocol that provides metrics for individual directions(near-end and far-end). This implementation uses eBPF TC Classifier programs to timestamp the packets directly inside the Linux networking stack to minimize processing delay factor in measurements. 
 PACKET FORMAT HERE
 ### Packet flow
-![better chart coming soon](assets/chart.png)
+0. Sender and reflector BPF programs are loaded and attached ahead of time
+1. STAMP packet is formed in the userspace with just the sequence number populated
+2. Sender's egress filter catches it and populates Timestamp 1
+3. Reflector's ingress filter catches the packet and:
+   - Populates Timestamp 2 as soon as the packet arrives
+   - Swaps the packet's IP, port and MAC in order to send it back
+   - Redirects it back onto the interface
+4. Reflector's egress filter catches the outgoing packet and populates Timestamp 3
+5. Sender's ingress filter catches the packet coming back and:
+   - Notes Timestamp 4 right away
+   - Strips the other 3 timestamps from the packet
+   - Calculates Near-end, Far-end and Roundtrip latencies off of timestamps...
+   - ... and passes that information back to userspace
+   - Userspace program processes the samples, calculates the actual metrics and prints them out
+![](assets/chart.png)
+(I'll make a better chart soon)
