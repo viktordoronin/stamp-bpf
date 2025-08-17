@@ -1,7 +1,7 @@
 # STAMP implementation for Go
 This is a STAMP Protocol([RFC 8762](https://datatracker.ietf.org/doc/html/rfc8762)) implementation using Go and eBPF. So far it only implements stateless unauthenticated mode and only supports amd64(if you have an ARM machine please consider contributing to a port!). It's a fully functional implementation, although I've yet to test it against an actual STAMP-capable network device like Cisco or Juniper.
 
-SCREENSHOT HERE
+![](assets/demo.gif)
 
 ## Requirements
 - 6.6 kernel
@@ -44,4 +44,4 @@ There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If
 STAMP is a network performance measurement protocol that provides metrics for individual directions(near-end and far-end). This implementation uses eBPF TC Classifier programs to timestamp the packets directly inside the Linux networking stack to minimize processing delay factor in measurements. 
 PACKET FORMAT HERE
 ### Packet flow
-![(better chart coming soon](assets/chart.png)
+![better chart coming soon](assets/chart.png)
