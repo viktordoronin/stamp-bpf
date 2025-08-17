@@ -31,7 +31,6 @@ func ParseSenderArgs() stamp.Args {
 	}
 
 	// grab interface
-	// TODO: look into parsing /proc/net/route and see if we can infer the interface from the dest IP
 	if iface, err := net.InterfaceByName(args.Dev); err!=nil {
 		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
 	} else { res.Dev=iface }
@@ -68,7 +67,7 @@ func ParseSenderArgs() stamp.Args {
 
 type reflectorArgs struct {
 	Dev string `arg:"positional,required"`
-	Src uint16 `arg:"-s" default:"862"`
+	Port uint16 `arg:"-p" default:"862"`
 	Debug bool
 }
 
@@ -78,7 +77,7 @@ func ParseReflectorArgs() stamp.Args {
 	parser:=arg.MustParse(&args)
 	
 	// check privileges before we do anything else
-	if err:=CheckPrivileges(int(args.Src)); err!=nil{
+	if err:=CheckPrivileges(int(args.Port)); err!=nil{
 		parser.Fail(fmt.Sprint(err))
 	}	
 	
@@ -94,7 +93,7 @@ func ParseReflectorArgs() stamp.Args {
 		parser.Fail(fmt.Sprintf("Failed to fetch local IP: %v", err))
 	}
 
-	res.S_port=int(args.Src)
+	res.S_port=int(args.Port)
 	res.Debug=args.Debug
 
 	return res	

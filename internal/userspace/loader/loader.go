@@ -3,6 +3,7 @@ package loader
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/cilium/ebpf"
@@ -50,8 +51,8 @@ func LoadSender(args stamp.Args) senderFD{
 		}
 		log.Fatalf("Error loading programs: %v",err)
 	} else {
+		fmt.Println("All programs successfully loaded and verified\n")
 		if args.Debug==true {
-			log.Print("All programs successfully loaded and verified")
 			log.Print(objs.SenderOut.VerifierLog)
 			log.Print(objs.SenderIn.VerifierLog)
 		}
@@ -96,8 +97,8 @@ func LoadReflector(args stamp.Args) reflectorFD{
 		}
 		log.Fatalf("Error loading programs: %v",err)
 	} else {
+		fmt.Println("All programs successfully loaded and verified\n")
 		if args.Debug==true {
-			log.Print("All programs successfully loaded and verified")
 			log.Print(objs.ReflectorIn.VerifierLog)
 			log.Print(objs.ReflectorOut.VerifierLog)
 		}

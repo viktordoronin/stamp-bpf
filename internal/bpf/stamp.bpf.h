@@ -34,10 +34,8 @@ uint32_t timestamp(struct ntp_ts *arg) {
   uint64_t ntps = utns / 1000000000 ; //this needs to be 64 bit to avoid over/underflows
   uint64_t ntpf = utns % 1000000000 ;
   ntps += 2208988800 ;
-  ntpf = ( ntpf << 32 ) ; //OLD CODE
+  ntpf = ( ntpf << 32 ) ; 
   ntpf /= 1000000000 ;
-  /* ntpf=ntpf*1000; // each fraction is 232 picoseconds */
-  /* ntpf=ntpf/232; */
   arg->ntp_secs=bpf_htonl((uint32_t) ntps); 
   arg->ntp_fracs=bpf_htonl((uint32_t) ntpf);
   return 0;
@@ -47,10 +45,8 @@ uint64_t untimestamp(struct ntp_ts *arg){
   uint64_t unix_ns = (uint64_t) bpf_ntohl(arg->ntp_fracs);
   //reverse conversion
   unix_s -= 2208988800 ;
-  unix_ns *= 1000000000 ; // OLD CODE
+  unix_ns *= 1000000000 ; 
   unix_ns = unix_ns >> 32 ;
-  /* unix_ns =  unix_ns * 232   ; */
-  /* unix_ns=unix_ns/1000; */
   //put it back into a full ns amount
   uint64_t res = unix_s*1000000000;
   res+= unix_ns;
@@ -78,13 +74,14 @@ uint32_t for_me(struct __sk_buff *skb, enum forme_dir dir){
   //grab the actual packet
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
-  if ( data + sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr) + 44 > data_end ) return TCX_PASS;
+  if ( data + sizeof(struct ethhdr)+sizeof(struct iphdr)+sizeof(struct udphdr) > data_end ) return TCX_PASS;
   //is it an IP packet?
   //the +0 has to be there, don't ask
   struct ethhdr *eh = data+0;
   if(eh->h_proto!=bpf_htons(ETH_P_IP)) return TCX_PASS;
   //IP header
   struct iphdr *iph = data+sizeof(struct ethhdr);
+  if (bpf_ntohs(iph->tot_len) != sizeof(struct iphdr)+sizeof(struct udphdr) + 44) return TCX_PASS;
   //these kinds of checks are mandated by the eBPF verifier, without them the program won't get loaded
   if (data + sizeof(struct iphdr) + sizeof(struct ethhdr) > data_end) return TCX_PASS;
   //Is it UDP?

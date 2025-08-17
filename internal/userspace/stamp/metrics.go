@@ -33,15 +33,14 @@ func queuePacket(seq uint32, timeout time.Duration){
 // this from the sample receiver
 func validPacket(seq uint32)bool{
 	mut.Lock()
+	defer mut.Unlock()
 	if packets[seq]!=nil {
 		packets[seq].Stop()
-		delete(packets,seq)
-		mut.Unlock()
+		delete(packets,seq) 
 		return true
 	}
-	mut.Unlock()
 	return false
-	}
+}
 // this as a timeout function
 func lostPacket(seq uint32){
 	mut.Lock()
@@ -71,13 +70,14 @@ type stampMetrics struct {
 	jitterAbs float64
 }
 func newMetricsRecord() stampMetrics{
-	//we need to set this to maximum or else it will remain 0 forever
-	return stampMetrics{Min: math.MaxFloat64}
+	return stampMetrics{}
 }
 // we update our Metrics with each new Sample
 func (m *stampMetrics) updateMetrics(sample float64){
 	m.Last=sample
-	m.Min=math.Min(m.Min,sample)
+	if m.Min!=0{
+		m.Min=math.Min(m.Min,sample)
+	} else { m.Min=sample }
 	m.Max=math.Max(m.Max,sample)
 	// math: suppose we got an average of 2 packets so far: avg=(x+y)/2
 	// in order to dynamically recalculate average accounting for packet z, we have to reclaim original sum: sum=avg*2
@@ -98,8 +98,11 @@ func (m *stampMetrics) String() string{
 type metricsCollection struct {
 	Near, Far, RT stampMetrics
 }
-func newMetricsCollection() metricsCollection {
-	return metricsCollection{Near: newMetricsRecord(), Far: newMetricsRecord(), RT: newMetricsRecord()}
+func newMetricsCollection(sample sample) metricsCollection {
+	m:=metricsCollection{Near: newMetricsRecord(), Far: newMetricsRecord(), RT: newMetricsRecord()}
+	m.UpdatemetricsCollection(sample)
+	pktCount=0
+	return m
 }
 //we can feed a sample to a collection and it will update itself
 func (col *metricsCollection) UpdatemetricsCollection(sample sample){
@@ -111,7 +114,7 @@ func (col *metricsCollection) UpdatemetricsCollection(sample sample){
 func (col *metricsCollection) String() string{
 	var res strings.Builder
 	var percentage float64=(float64(pktLost)/float64(pktTotal))*100
-	fmt.Fprintf(&res,"\033[F\033[F\033[F\033[FPackets:   sent %-4d      received %-4d  lost %-4d      percentage %4.2f%%\n",pktTotal,pktCount,pktLost,percentage)
+	fmt.Fprintf(&res,"\033[F\033[F\033[F\033[FPackets:   sent %-4d      received %-4d  lost %-4d      loss %4.2f%%\n",pktTotal,pktCount,pktLost,percentage)
 	fmt.Fprintf(&res,"Near-end:  %s\n",col.Near.String())
 	fmt.Fprintf(&res,"Far-end:   %s\n",col.Far.String())
 	fmt.Fprintf(&res,"Roundtrip: %s\n",col.RT.String())	

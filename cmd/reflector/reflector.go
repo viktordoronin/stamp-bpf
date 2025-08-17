@@ -12,8 +12,6 @@ import (
 )
 
 func main(){
-	// TODO: start/stop mode w/ program pins
-
 	// parse and validate args, get a struct with the stuff we will need
 	// reflector and sender use the same struct, so for reflector many of args fields will be zero - be careful
 	args:=cli.ParseReflectorArgs()
