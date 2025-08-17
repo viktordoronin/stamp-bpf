@@ -18,58 +18,66 @@ func (senderArgs) Epilogue() string {
 }
 
 type senderArgs struct {
-	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
-	IP string `arg:"positional,required" help:"Session-Reflector's IP to send packets to"`
-	Src uint16 `arg:"-s" default:"862" help:"source port"`
-	Dest uint16 `arg:"-d" default:"862" help:"destination port"`
-	Count uint32 `arg:"-c,--" default:"0" help:"number of packets to send; infinite by default"`
+	Device   string  `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
+	IP       string  `arg:"positional,required" help:"Session-Reflector's IP to send packets to"`
+	Src      uint16  `arg:"-s" default:"862" help:"source port"`
+	Dest     uint16  `arg:"-d" default:"862" help:"destination port"`
+	Count    uint32  `arg:"-c,--" default:"0" help:"number of packets to send; infinite by default"`
 	Interval float64 `arg:"-i,--" default:"1" help:"interval between packets sent, in seconds; takes sub-1 arguments"`
-	Debug bool `help:"get BPF verifier output log and other debug info"`
-	Timeout uint32 `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
+	Debug    bool    `help:"get BPF verifier output log and other debug info"`
+	Timeout  uint32  `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
 }
 
 func ParseSenderArgs() stamp.Args {
 	var args senderArgs
 	var res stamp.Args
-	parser:=arg.MustParse(&args)
-	
+	parser := arg.MustParse(&args)
+
 	// check privileges before we do anything else
-	if err:=CheckPrivileges(int(args.Src)); err!=nil{
+	if err := CheckPrivileges(int(args.Src)); err != nil {
 		parser.Fail(fmt.Sprint(err))
 	}
 
 	// grab interface
-	if iface, err := net.InterfaceByName(args.Device); err!=nil {
-		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Device,err))
-	} else { res.Dev=iface }
-	
+	if iface, err := net.InterfaceByName(args.Device); err != nil {
+		parser.Fail(fmt.Sprintf("Could not get interface %s: %v", args.Device, err))
+	} else {
+		res.Dev = iface
+	}
+
 	// grab local IP
-	addrs,err:=res.Dev.Addrs()
-	res.Localaddr,_,err=net.ParseCIDR(addrs[0].String())
-	if res.Localaddr==nil || err != nil {
+	addrs, err := res.Dev.Addrs()
+	res.Localaddr, _, err = net.ParseCIDR(addrs[0].String())
+	if res.Localaddr == nil || err != nil {
 		parser.Fail(fmt.Sprintf("Failed to fetch local IP: %v", err))
 	}
 
 	// parse IP
-	if parsedIP:=net.ParseIP(args.IP); parsedIP==nil {
-		parser.Fail(fmt.Sprintf("Can't parse IP: %s",args.IP))
-	} else { res.IP=parsedIP }
+	if parsedIP := net.ParseIP(args.IP); parsedIP == nil {
+		parser.Fail(fmt.Sprintf("Can't parse IP: %s", args.IP))
+	} else {
+		res.IP = parsedIP
+	}
 
 	// cool hack - by making port numbers uint16, we limit them to 0-65536 without any explicit checks
-	res.S_port=int(args.Src)
-	res.D_port=int(args.Dest)
+	res.S_port = int(args.Src)
+	res.D_port = int(args.Dest)
 
-	if args.Interval<=0 {
+	if args.Interval <= 0 {
 		parser.Fail(fmt.Sprintf("Interval has to be positive"))
-	} else { res.Interval=time.Millisecond*time.Duration(args.Interval*1000) }
-	
-	if args.Timeout<=0 {
+	} else {
+		res.Interval = time.Millisecond * time.Duration(args.Interval*1000)
+	}
+
+	if args.Timeout <= 0 {
 		parser.Fail(fmt.Sprintf("Timeout has to be positive"))
-	} else { res.Timeout=time.Second*time.Duration(args.Timeout) }
-	
-	res.Count=args.Count
-	res.Debug=args.Debug
-	
+	} else {
+		res.Timeout = time.Second * time.Duration(args.Timeout)
+	}
+
+	res.Count = args.Count
+	res.Debug = args.Debug
+
 	return res
 }
 
@@ -83,34 +91,36 @@ func (reflectorArgs) Epilogue() string {
 
 type reflectorArgs struct {
 	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
-	Port uint16 `arg:"-p" default:"862" help:"port to listen on"`
-	Debug bool `help:"get BPF verifier output log and other debug info"`
+	Port   uint16 `arg:"-p" default:"862" help:"port to listen on"`
+	Debug  bool   `help:"get BPF verifier output log and other debug info"`
 }
 
 func ParseReflectorArgs() stamp.Args {
 	var args reflectorArgs
 	var res stamp.Args
-	parser:=arg.MustParse(&args)
-	
+	parser := arg.MustParse(&args)
+
 	// check privileges before we do anything else
-	if err:=CheckPrivileges(int(args.Port)); err!=nil{
+	if err := CheckPrivileges(int(args.Port)); err != nil {
 		parser.Fail(fmt.Sprint(err))
-	}	
-	
+	}
+
 	// grab interface
-	if iface, err := net.InterfaceByName(args.Device);err!=nil{
-		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Device,err))
-	} else {res.Dev=iface}
+	if iface, err := net.InterfaceByName(args.Device); err != nil {
+		parser.Fail(fmt.Sprintf("Could not get interface %s: %v", args.Device, err))
+	} else {
+		res.Dev = iface
+	}
 
 	// grab local IP
-	addrs,err:=res.Dev.Addrs()
-	res.Localaddr,_,err=net.ParseCIDR(addrs[0].String())
-	if res.Localaddr==nil || err != nil {
+	addrs, err := res.Dev.Addrs()
+	res.Localaddr, _, err = net.ParseCIDR(addrs[0].String())
+	if res.Localaddr == nil || err != nil {
 		parser.Fail(fmt.Sprintf("Failed to fetch local IP: %v", err))
 	}
 
-	res.S_port=int(args.Port)
-	res.Debug=args.Debug
+	res.S_port = int(args.Port)
+	res.Debug = args.Debug
 
-	return res	
+	return res
 }

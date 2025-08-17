@@ -11,15 +11,15 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
 )
 
-func main(){
+func main() {
 	// parse and validate args, get a struct with the stuff we will need
 	// reflector and sender use the same struct, so for reflector many of args fields will be zero - be careful
-	args:=cli.ParseReflectorArgs()
-	
+	args := cli.ParseReflectorArgs()
+
 	// Load the compiled eBPF ELF and load it into the kernel.
-	bpf:=loader.LoadReflector(args)
+	bpf := loader.LoadReflector(args)
 	defer bpf.Close()
-	
+
 	// hang up
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
