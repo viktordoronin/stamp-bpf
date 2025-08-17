@@ -9,15 +9,23 @@ import (
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
 )
 
+func (senderArgs) Description() string {
+	return "\nSTAMP Session-Sender\n"
+}
+
+func (senderArgs) Epilogue() string {
+	return "head over to https://github.com/viktordoronin/stamp-bpf for more info and updates\n"
+}
+
 type senderArgs struct {
-	Dev string `arg:"positional,required"`
-	IP string `arg:"positional,required"`
-	Src uint16 `arg:"-s" default:"862"`
-	Dest uint16 `arg:"-d" default:"862"`
-	Count uint32 `arg:"-c,--" default:"0"`
-	Interval float64 `arg:"-i,--" default:"1"`
-	Debug bool
-	Timeout uint32 `arg:"-w,--" default:"1"`
+	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
+	IP string `arg:"positional,required" help:"Session-Reflector's IP to send packets to"`
+	Src uint16 `arg:"-s" default:"862" help:"source port"`
+	Dest uint16 `arg:"-d" default:"862" help:"destination port"`
+	Count uint32 `arg:"-c,--" default:"0" help:"number of packets to send; infinite by default"`
+	Interval float64 `arg:"-i,--" default:"1" help:"interval between packets sent, in seconds; takes sub-1 arguments"`
+	Debug bool `help:"get BPF verifier output log and other debug info"`
+	Timeout uint32 `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -31,8 +39,8 @@ func ParseSenderArgs() stamp.Args {
 	}
 
 	// grab interface
-	if iface, err := net.InterfaceByName(args.Dev); err!=nil {
-		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
+	if iface, err := net.InterfaceByName(args.Device); err!=nil {
+		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Device,err))
 	} else { res.Dev=iface }
 	
 	// grab local IP
@@ -65,10 +73,18 @@ func ParseSenderArgs() stamp.Args {
 	return res
 }
 
+func (reflectorArgs) Description() string {
+	return "\nSTAMP Session-Reflector\n"
+}
+
+func (reflectorArgs) Epilogue() string {
+	return "head over to https://github.com/viktordoronin/stamp-bpf for more info and updates\n"
+}
+
 type reflectorArgs struct {
-	Dev string `arg:"positional,required"`
-	Port uint16 `arg:"-p" default:"862"`
-	Debug bool
+	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
+	Port uint16 `arg:"-p" default:"862" help:"port to listen on"`
+	Debug bool `help:"get BPF verifier output log and other debug info"`
 }
 
 func ParseReflectorArgs() stamp.Args {
@@ -82,8 +98,8 @@ func ParseReflectorArgs() stamp.Args {
 	}	
 	
 	// grab interface
-	if iface, err := net.InterfaceByName(args.Dev);err!=nil{
-		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Dev,err))
+	if iface, err := net.InterfaceByName(args.Device);err!=nil{
+		parser.Fail(fmt.Sprintf("Could not get interface %s: %v",args.Device,err))
 	} else {res.Dev=iface}
 
 	// grab local IP

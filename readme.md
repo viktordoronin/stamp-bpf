@@ -23,6 +23,7 @@ You're provided with a quick proof-of-concept demo that uses Docker to simulate 
 reflector eth0 -p 1000
 ```
 `reflector` can handle several sessions at once and doesn't keep track of individual sessions (stateful mode) at this time. 
+
 **IMPORTANT**: `reflector` needs to remain running in order for the program to function; use `&` if you'll need to use the same shell
 
 ## Sender
@@ -35,14 +36,14 @@ There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If
 ## Upcoming features
 - Stateful mode([RFC](https://datatracker.ietf.org/doc/html/rfc8762#name-theory-of-operation)) - have `reflector` track individual sessions and get directional packet loss measurements at the end of a test.
 - Unified binary - `stamp reflector ...` or `stamp sender ...` for easier distribution and deployment. Docker image will be published when this feature is released.
-- Network daemon mode for `reflector` - utilize BPF pinning to load, unload and reattach the BPF programs without having to keep the userspace component running - similar to `tc qdisc add/change/del` syntax.
+- Network daemon mode for `reflector` - utilize BPF pinning to load, unload and reattach the BPF programs without having to keep the userspace component running similar to `tc qdisc add/change/del` syntax.
 - ARM and other architecture support
 - Authenticated mode([RFC](https://datatracker.ietf.org/doc/html/rfc8762#name-session-sender-packet-format)) - encrypt your sessions to make sure your measurements can be trusted.
 - Protocol extensions - RFCs [8972](https://datatracker.ietf.org/doc/rfc8972/) and [9503](https://datatracker.ietf.org/doc/rfc9503/)
 
 ## About STAMP
 STAMP is a network performance measurement protocol that provides metrics for individual directions(near-end and far-end). This implementation uses eBPF TC Classifier programs to timestamp the packets directly inside the Linux networking stack to minimize processing delay factor in measurements. 
-PACKET FORMAT HERE
+
 ### Packet flow
 0. Sender and reflector BPF programs are loaded and attached ahead of time
 1. STAMP packet is formed in the userspace with just the sequence number populated
