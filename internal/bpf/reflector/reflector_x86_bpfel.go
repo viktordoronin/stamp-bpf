@@ -8,9 +8,16 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"structs"
 
 	"github.com/cilium/ebpf"
 )
+
+type ReflectorSample struct {
+	_   structs.HostLayout
+	Seq uint32
+	Sam uint64
+}
 
 // LoadReflector returns the embedded CollectionSpec for Reflector.
 func LoadReflector() (*ebpf.CollectionSpec, error) {
@@ -62,6 +69,7 @@ type ReflectorProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type ReflectorMapSpecs struct {
+	Output *ebpf.MapSpec `ebpf:"output"`
 }
 
 // ReflectorVariableSpecs contains global variables before they are loaded into the kernel.
@@ -93,10 +101,13 @@ func (o *ReflectorObjects) Close() error {
 //
 // It can be passed to LoadReflectorObjects or ebpf.CollectionSpec.LoadAndAssign.
 type ReflectorMaps struct {
+	Output *ebpf.Map `ebpf:"output"`
 }
 
 func (m *ReflectorMaps) Close() error {
-	return _ReflectorClose()
+	return _ReflectorClose(
+		m.Output,
+	)
 }
 
 // ReflectorVariables contains all global variables after they have been loaded into the kernel.

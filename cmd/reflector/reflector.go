@@ -9,6 +9,7 @@ import (
 
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/cli"
 	"github.com/viktordoronin/stamp-bpf/internal/userspace/loader"
+	"github.com/viktordoronin/stamp-bpf/internal/userspace/stamp"
 )
 
 func main() {
@@ -18,8 +19,12 @@ func main() {
 
 	// Load the compiled eBPF ELF and load it into the kernel.
 	bpf := loader.LoadReflector(args)
+	args.OutputMap = bpf.Objs.Output
 	defer bpf.Close()
 
+	// does nothing without the --output flag
+	stamp.RefSession(args)
+	
 	// hang up
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)

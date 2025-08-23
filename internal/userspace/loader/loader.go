@@ -141,9 +141,5 @@ func LoadReflector(args stamp.Args) reflectorFD {
 		objs.Tai.Set(uint16(0))
 	}
 
-	var buf uint16
-	objs.Tai.Get(&buf)
-	fmt.Println(buf)
-
 	return reflectorFD{Objs: objs, L_in: l_in, L_out: l_out}
 }

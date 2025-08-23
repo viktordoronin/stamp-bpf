@@ -24,6 +24,7 @@ type Args struct {
 	Hist                bool
 	HistB, HistF, HistC uint32
 	HistPath            string
+	Output bool
 }
 
 func StartSession(args Args) {
@@ -39,5 +40,16 @@ func StartSession(args Args) {
 	eg.Go(func() error { return output(ctx, args) })
 	if err := eg.Wait(); err != nil {
 		log.Fatalf("Error while running the STAMP session: %v", err)
+	}
+}
+
+func RefSession(args Args){
+	if args.Output==true {
+		fmt.Println("Printing out session metrics as they arrive")
+		eg, ctx := errgroup.WithContext(context.Background())
+		eg.Go(func() error { return reflectorOutput(ctx, args) })
+		if err := eg.Wait(); err != nil {
+			log.Fatalf("Error while running the STAMP session: %v", err)
+		}
 	}
 }

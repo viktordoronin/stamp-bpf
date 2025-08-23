@@ -32,7 +32,7 @@ test: binaries
 	docker compose -f ./docker/testing/compose.yaml up -d -t0
 	docker exec stamp_reflector tc qdisc add dev eth0 root netem delay 100ms 20ms distribution normal
 	docker exec stamp_sender tc qdisc add dev eth0 root netem delay 50ms 10ms distribution normal loss 20% 
-	docker exec -d stamp_reflector /home/bin/reflector eth0 
+	docker exec -d stamp_reflector /home/bin/reflector eth0 --hist 28 25 75 --histpath /home/hist --output
 	docker exec stamp_sender /home/bin/sender eth0 172.30.0.3 -i 0.5 -c 100 -s 1000 --hist 28 100 200 --histpath /home/hist
 #	docker compose -f ./docker/testing/compose.yaml down -t0
 

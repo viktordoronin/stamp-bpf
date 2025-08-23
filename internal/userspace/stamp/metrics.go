@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/viktordoronin/stamp-bpf/internal/bpf/reflector"
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
@@ -64,6 +65,19 @@ func newSample(s *sender.SenderSample) sample {
 		Far:  (float64)(s.Far) * 1e-6,
 		RT:   (float64)(s.Rt) * 1e-6,
 		Seq:  s.Seq,
+	}
+}
+
+type refSample struct {
+	seq uint32
+	sam float64
+}
+
+func newRefSample(s *reflector.ReflectorSample) refSample {
+	pktCount++
+	return refSample{
+		seq: s.Seq,
+		sam: (float64)(s.Sam)*1e-6,
 	}
 }
 

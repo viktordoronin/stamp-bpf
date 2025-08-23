@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
+	"github.com/viktordoronin/stamp-bpf/internal/bpf/reflector"
 	"github.com/viktordoronin/stamp-bpf/internal/bpf/sender"
 )
 
@@ -62,4 +63,49 @@ func output(ctx context.Context, args Args) error {
 		os.WriteFile(args.HistPath, []byte(hist.String()), 0644)
 	}
 	return nil
+}
+
+func reflectorOutput(ctx context.Context, args Args) error {
+	rd, err := ringbuf.NewReader(args.OutputMap)
+	if err != nil {
+		return fmt.Errorf("opening ringbuf reader: %w", err)
+	}
+	defer rd.Close()
+	ticker := time.NewTicker(time.Millisecond*100)
+	var sample reflector.ReflectorSample
+	var met stampMetrics = newMetricsRecord()
+	var hist stampHist
+	//this prints out the hist to a file, but only if we set --hist
+	if args.Hist == true {
+		histopts := histArgs{Bins: args.HistB, Floor: args.HistF, Ceil: args.HistC}
+		hist = newHistogram(histopts)
+	}
+	var record ringbuf.Record
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		if rd.AvailableBytes() > 0 {
+			record, err = rd.Read()
+			//read a record
+			if err = binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &sample); err != nil {
+				return fmt.Errorf("Parsing ringbuf record: %w", err)
+			}
+			//update metrics
+			met.updateMetrics(newRefSample(&sample).sam)
+			if args.Hist == true {
+				hist.updateHistogram(newRefSample(&sample).sam)
+			}
+		}
+		// print out metrics
+		fmt.Printf("%s \r",met.String())
+		//we can't make assumptions regarding session length on reflector side
+		//so we print a file every time we receive a packet
+		if args.Hist == true {
+			os.WriteFile(args.HistPath, []byte(hist.String()), 0644)
+		}
+		<-ticker.C
+	}
 }

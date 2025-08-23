@@ -33,6 +33,7 @@ type senderArgs struct {
 func ParseSenderArgs() stamp.Args {
 	var args senderArgs
 	var res stamp.Args
+	res.Output=true
 	parser := arg.MustParse(&args)
 
 	// check privileges before we do anything else
@@ -88,7 +89,7 @@ func ParseSenderArgs() stamp.Args {
 		res.HistPath = args.Histpath
 		fmt.Println(res.HistPath)
 	} else if len(args.Hist) != 0 {
-		parser.Fail(fmt.Sprintf("--hist takes four args: bins, floor, ceiling"))
+		parser.Fail(fmt.Sprintf("--hist takes three args: bins, floor, ceiling"))
 	} else {
 		res.Hist = false
 	}
@@ -108,6 +109,9 @@ type reflectorArgs struct {
 	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
 	Port   uint16 `arg:"-p" default:"862" help:"port to listen on"`
 	Debug  bool   `help:"get BPF verifier output log and other debug info"`
+	Output bool `help:"print output - CAN'T PROPERLY HANDLE SIMULTANEOUS SESSIONS, HIST ARGS WITHOUT THIS FLAG WILL BE IGNORED"`
+	Hist     []uint32 `help:"print out a histogram, args: number of bins, value floor, value ceiling"`
+	Histpath string   `default:"./hist" help:"output path for the histogram"`
 }
 
 func ParseReflectorArgs() stamp.Args {
@@ -136,6 +140,20 @@ func ParseReflectorArgs() stamp.Args {
 
 	res.S_port = int(args.Port)
 	res.Debug = args.Debug
+	res.Output=args.Output
 
+	if len(args.Hist) == 3 && args.Output==true {
+		res.Hist = true
+		res.HistB = args.Hist[0]
+		res.HistF = args.Hist[1]
+		res.HistC = args.Hist[2]
+		res.HistPath = args.Histpath
+		fmt.Println(res.HistPath)
+	} else if len(args.Hist) != 0 {
+		parser.Fail(fmt.Sprintf("--hist takes three args: bins, floor, ceiling\nmaybe you forgot --output?"))
+	} else {
+		res.Hist = false
+	}
+	
 	return res
 }

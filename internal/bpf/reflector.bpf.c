@@ -15,6 +15,18 @@
 
 char __license[] SEC("license")="GPL";
 
+struct sample{
+  uint32_t seq;
+  uint64_t sam;
+} __attribute__((packed));
+
+//packet info - for output
+struct {
+  __uint(type, BPF_MAP_TYPE_RINGBUF);
+  __uint(max_entries, 4096);
+  __type(value, struct sample);
+} output SEC(".maps");
+
 SEC("tc/ingress")
 int reflector_in(struct __sk_buff *skb){
   //lots of work here - convert senderpkt into reflectorpkt
@@ -44,6 +56,15 @@ int reflector_in(struct __sk_buff *skb){
   sn_ts.ntp_secs=sn->t1_s;
   sn_ts.ntp_fracs=sn->t1_f;
   uint8_t ttl=iph->ttl;
+
+  //output available metrics to userspace
+  uint64_t timestamps[2];
+  timestamps[0]=untimestamp(&sn_ts);
+  timestamps[1]=untimestamp(&rec_ts);
+  struct sample s;
+  s.seq=bpf_ntohl(seq);
+  s.sam=timestamps[1]-timestamps[0];
+  bpf_ringbuf_output(&output, &s, sizeof(struct sample), 0);
   
   //Populate receivepkt(they're the same size so it's legal)
   if(data + sizeof(struct iphdr) + sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct reflectorpkt) > data_end)
@@ -64,7 +85,7 @@ int reflector_in(struct __sk_buff *skb){
      return TCX_PASS;
   offset=stampoffset(offsetof(struct reflectorpkt, ttl));
   bpf_skb_store_bytes(skb,offset,&ttl,sizeof(ttl),0);
-
+  
   //we attempt to redirect the packet
   //this may quietly fail, check this in case of unexplainable packet loss
   return pkt_turnaround(skb);
