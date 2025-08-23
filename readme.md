@@ -59,5 +59,6 @@ STAMP is a network performance measurement protocol that provides metrics for in
    - Calculates Near-end, Far-end and Roundtrip latencies off of timestamps...
    - ... and passes that information back to userspace
    - Userspace program processes the samples, calculates the actual metrics and prints them out
+
 ![](assets/chart.png)
 (I'll make a better chart soon)
