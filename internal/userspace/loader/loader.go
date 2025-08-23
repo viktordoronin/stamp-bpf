@@ -83,6 +83,13 @@ func LoadSender(args stamp.Args) senderFD {
 	objs.Laddr.Set(ip)
 	objs.S_port.Set(uint16(args.S_port))
 
+	// Check if we need to adjust TAI
+	if checkTAI() == true {
+		objs.Tai.Set(uint16(1))
+	} else {
+		objs.Tai.Set(uint16(0))
+	}
+
 	return senderFD{Objs: objs, L_in: l_in, L_out: l_out}
 }
 
@@ -126,6 +133,17 @@ func LoadReflector(args stamp.Args) reflectorFD {
 	ip := binary.LittleEndian.Uint32(args.Localaddr.To4())
 	objs.Laddr.Set(ip)
 	objs.S_port.Set(uint16(args.S_port))
+
+	// Check if we need to adjust TAI
+	if checkTAI() == true {
+		objs.Tai.Set(uint16(1))
+	} else {
+		objs.Tai.Set(uint16(0))
+	}
+
+	var buf uint16
+	objs.Tai.Get(&buf)
+	fmt.Println(buf)
 
 	return reflectorFD{Objs: objs, L_in: l_in, L_out: l_out}
 }

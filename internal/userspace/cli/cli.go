@@ -18,14 +18,16 @@ func (senderArgs) Epilogue() string {
 }
 
 type senderArgs struct {
-	Device   string  `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
-	IP       string  `arg:"positional,required" help:"Session-Reflector's IP to send packets to"`
-	Src      uint16  `arg:"-s" default:"862" help:"source port"`
-	Dest     uint16  `arg:"-d" default:"862" help:"destination port"`
-	Count    uint32  `arg:"-c,--" default:"0" help:"number of packets to send; infinite by default"`
-	Interval float64 `arg:"-i,--" default:"1" help:"interval between packets sent, in seconds; takes sub-1 arguments"`
-	Debug    bool    `help:"get BPF verifier output log and other debug info"`
-	Timeout  uint32  `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
+	Device   string   `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
+	IP       string   `arg:"positional,required" help:"Session-Reflector's IP to send packets to"`
+	Src      uint16   `arg:"-s" default:"862" help:"source port"`
+	Dest     uint16   `arg:"-d" default:"862" help:"destination port"`
+	Count    uint32   `arg:"-c,--" default:"0" help:"number of packets to send; infinite by default"`
+	Interval float64  `arg:"-i,--" default:"1" help:"interval between packets sent, in seconds; takes sub-1 arguments"`
+	Debug    bool     `help:"get BPF verifier output log and other debug info"`
+	Timeout  uint32   `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
+	Hist     []uint32 `help:"print out a histogram, args: number of bins, value floor, value ceiling"`
+	Histpath string   `default:"./hist" help:"output path for the histogram"`
 }
 
 func ParseSenderArgs() stamp.Args {
@@ -77,6 +79,19 @@ func ParseSenderArgs() stamp.Args {
 
 	res.Count = args.Count
 	res.Debug = args.Debug
+
+	if len(args.Hist) == 3 {
+		res.Hist = true
+		res.HistB = args.Hist[0]
+		res.HistF = args.Hist[1]
+		res.HistC = args.Hist[2]
+		res.HistPath = args.Histpath
+		fmt.Println(res.HistPath)
+	} else if len(args.Hist) != 0 {
+		parser.Fail(fmt.Sprintf("--hist takes four args: bins, floor, ceiling"))
+	} else {
+		res.Hist = false
+	}
 
 	return res
 }

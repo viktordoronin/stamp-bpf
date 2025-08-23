@@ -120,12 +120,59 @@ func (col *metricsCollection) UpdatemetricsCollection(sample sample) {
 	col.Far.updateMetrics(sample.Far)
 	col.Near.updateMetrics(sample.Near)
 }
+
 func (col *metricsCollection) String() string {
 	var res strings.Builder
 	var percentage float64 = (float64(pktLost) / float64(pktTotal)) * 100
-	fmt.Fprintf(&res, "\033[F\033[F\033[F\033[FPackets:   sent %-4d      received %-4d  lost %-4d      loss %4.2f%%\n", pktTotal, pktCount, pktLost, percentage)
+	fmt.Fprintf(&res, "\033[F\033[F\033[F\033[FPackets:   sent %-4d      received %-4d  lost %-4d      loss %4.2f%%    \n", pktTotal, pktCount, pktLost, percentage)
 	fmt.Fprintf(&res, "Near-end:  %s\n", col.Near.String())
 	fmt.Fprintf(&res, "Far-end:   %s\n", col.Far.String())
 	fmt.Fprintf(&res, "Roundtrip: %s\n", col.RT.String())
 	return res.String()
+}
+
+// histogram
+type stampHist struct {
+	step, floor, ceil, last uint32
+	hist                    []uint32
+}
+
+type histArgs struct {
+	Bins, Floor, Ceil uint32
+}
+
+// math explained in test/bins.go
+func newHistogram(args histArgs) stampHist {
+	var h stampHist
+	h.ceil = args.Ceil
+	h.floor = args.Floor
+	h.hist = make([]uint32, args.Bins)
+	h.step = uint32(math.Round((float64(args.Ceil - args.Floor)) / float64(args.Bins-2)))
+	h.last = args.Bins - 1
+	return h
+}
+
+func (h *stampHist) updateHistogram(s float64) {
+	if s == 0 {
+		return
+	}
+	var i uint32
+	switch {
+	case s <= float64(h.floor):
+		i = 0
+	case s >= float64(h.ceil):
+		i = h.last
+	default:
+		i = uint32(math.Floor((s-float64(h.floor))/float64(h.step)) + 1)
+	}
+	h.hist[i]++
+}
+
+func (h *stampHist) String() string {
+	var s string
+	for _, val := range h.hist {
+		s += fmt.Sprint(val, " ")
+	}
+	s += fmt.Sprint("\n")
+	return s
 }

@@ -70,6 +70,7 @@ type ReflectorMapSpecs struct {
 type ReflectorVariableSpecs struct {
 	Laddr  *ebpf.VariableSpec `ebpf:"laddr"`
 	S_port *ebpf.VariableSpec `ebpf:"s_port"`
+	Tai    *ebpf.VariableSpec `ebpf:"tai"`
 }
 
 // ReflectorObjects contains all objects after they have been loaded into the kernel.
@@ -104,6 +105,7 @@ func (m *ReflectorMaps) Close() error {
 type ReflectorVariables struct {
 	Laddr  *ebpf.Variable `ebpf:"laddr"`
 	S_port *ebpf.Variable `ebpf:"s_port"`
+	Tai    *ebpf.Variable `ebpf:"tai"`
 }
 
 // ReflectorPrograms contains all programs after they have been loaded into the kernel.

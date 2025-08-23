@@ -13,12 +13,18 @@
 #include <bpf/bpf_tracing.h>
 
 // global vars for for-me check
-volatile uint32_t laddr;
-volatile uint16_t s_port;
+volatile uint32_t laddr; // local IP
+volatile uint16_t s_port; // source port 
+volatile uint16_t tai; // flag for TAI correction
 
 enum forme_dir {
   FORME_OUTBOUND,
   FORME_INBOUND,
+};
+
+enum tai_corr {
+  TAI_CORRECT,
+  TAI_LEAP,
 };
   
 struct senderpkt; //proto
@@ -32,6 +38,9 @@ struct ntp_ts{
 uint32_t timestamp(struct ntp_ts *arg) {
   uint64_t utns = bpf_ktime_get_tai_ns(); //Unix nanoseconds
   uint64_t ntps = utns / 1000000000 ; //this needs to be 64 bit to avoid over/underflows
+  if (tai==TAI_LEAP) { //we add leap seconds to TAI if userspace detects that it hasn't been done
+    ntps=ntps+37;
+  }
   uint64_t ntpf = utns % 1000000000 ;
   ntps += 2208988800 ;
   ntpf = ( ntpf << 32 ) ; 

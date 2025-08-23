@@ -1,5 +1,5 @@
 Requirements:
-- Docker
+- Docker Compose 2.36+ ("docker compose version" to check)
 - 6.6 kernel
 If this fails to run for any reason please let me know: https://github.com/viktordoronin/stamp-bpf
 
