@@ -33,6 +33,15 @@ sender eth0 111.222.33.44 -c100 -i 0.5 -d 1000 -s 1001
 ```
 There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If you specified a finite number of packets to send it will quit on its own once all packets are accounted for(received or lost). It only does one STAMP session at a time. 
 
+## Clock syncing
+It's important to have clock synchronization between the two machines to ensure precise measurements; however, due to overall complexity of the topic, system clock synchronization is largely left up to the system admin. Nonetheless, there are some features present to help you figure things out.
+
+## Troubleshooting
+`stamp-bpf` emits descriptive messages in case of error, however, not every error can be accounted for so here's some pointers for potential problems.
+
+## Histogram
+`stamp-bpf` includes option for histogram output which you can then interpret and visualize however you like. 
+
 ## Upcoming features
 - Stateful mode([RFC](https://datatracker.ietf.org/doc/html/rfc8762#name-theory-of-operation)) - have `reflector` track individual sessions and get directional packet loss measurements at the end of a test.
 - Unified binary - `stamp reflector ...` or `stamp sender ...` for easier distribution and deployment. Docker image will be published when this feature is released.
