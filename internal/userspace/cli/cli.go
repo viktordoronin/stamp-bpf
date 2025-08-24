@@ -28,12 +28,14 @@ type senderArgs struct {
 	Timeout  uint32   `arg:"-w,--" default:"1" help:"timeout before a packet is considered lost, in seconds"`
 	Hist     []uint32 `help:"print out a histogram, args: number of bins, value floor, value ceiling"`
 	Histpath string   `default:"./hist" help:"output path for the histogram"`
+	Sync     bool     `arg:"--enforce-sync" help:"abort if no clock syncing detected"`
+	PTP      bool     `arg:"--enforce-ptp" help:"abort if no PTP syncing detected (assumes systemd, possibly unstable)"`
 }
 
 func ParseSenderArgs() stamp.Args {
 	var args senderArgs
 	var res stamp.Args
-	res.Output=true
+	res.Output = true
 	parser := arg.MustParse(&args)
 
 	// check privileges before we do anything else
@@ -80,14 +82,18 @@ func ParseSenderArgs() stamp.Args {
 
 	res.Count = args.Count
 	res.Debug = args.Debug
+	res.Sync = args.Sync
+	res.PTP = args.PTP
 
 	if len(args.Hist) == 3 {
 		res.Hist = true
+		if args.Hist[0] < 3 {
+			parser.Fail(fmt.Sprintf("the amount of bins has to be at least 3"))
+		}
 		res.HistB = args.Hist[0]
 		res.HistF = args.Hist[1]
 		res.HistC = args.Hist[2]
 		res.HistPath = args.Histpath
-		fmt.Println(res.HistPath)
 	} else if len(args.Hist) != 0 {
 		parser.Fail(fmt.Sprintf("--hist takes three args: bins, floor, ceiling"))
 	} else {
@@ -106,12 +112,14 @@ func (reflectorArgs) Epilogue() string {
 }
 
 type reflectorArgs struct {
-	Device string `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
-	Port   uint16 `arg:"-p" default:"862" help:"port to listen on"`
-	Debug  bool   `help:"get BPF verifier output log and other debug info"`
-	Output bool `help:"print output - CAN'T PROPERLY HANDLE SIMULTANEOUS SESSIONS, HIST ARGS WITHOUT THIS FLAG WILL BE IGNORED"`
+	Device   string   `arg:"positional,required" help:"network device to attach BPF programs to, e.g. eth0"`
+	Port     uint16   `arg:"-p" default:"862" help:"port to listen on"`
+	Debug    bool     `help:"get BPF verifier output log and other debug info"`
+	Output   bool     `help:"print output - CAN'T PROPERLY HANDLE SIMULTANEOUS SESSIONS, HIST ARGS WITHOUT THIS FLAG WILL BE IGNORED"`
 	Hist     []uint32 `help:"print out a histogram, args: number of bins, value floor, value ceiling"`
 	Histpath string   `default:"./hist" help:"output path for the histogram"`
+	Sync     bool     `arg:"--enforce-sync" help:"abort if no clock syncing detected"`
+	PTP      bool     `arg:"--enforce-ptp" help:"abort if no PTP syncing detected (assumes systemd, possibly unstable)"`
 }
 
 func ParseReflectorArgs() stamp.Args {
@@ -140,20 +148,24 @@ func ParseReflectorArgs() stamp.Args {
 
 	res.S_port = int(args.Port)
 	res.Debug = args.Debug
-	res.Output=args.Output
+	res.Output = args.Output
+	res.Sync = args.Sync
+	res.PTP = args.PTP
 
-	if len(args.Hist) == 3 && args.Output==true {
+	if len(args.Hist) == 3 && args.Output == true {
 		res.Hist = true
+		if args.Hist[0] < 3 {
+			parser.Fail(fmt.Sprintf("the amount of bins has to be at least 3"))
+		}
 		res.HistB = args.Hist[0]
 		res.HistF = args.Hist[1]
 		res.HistC = args.Hist[2]
 		res.HistPath = args.Histpath
-		fmt.Println(res.HistPath)
 	} else if len(args.Hist) != 0 {
 		parser.Fail(fmt.Sprintf("--hist takes three args: bins, floor, ceiling\nmaybe you forgot --output?"))
 	} else {
 		res.Hist = false
 	}
-	
+
 	return res
 }

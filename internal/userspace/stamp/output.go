@@ -71,7 +71,7 @@ func reflectorOutput(ctx context.Context, args Args) error {
 		return fmt.Errorf("opening ringbuf reader: %w", err)
 	}
 	defer rd.Close()
-	ticker := time.NewTicker(time.Millisecond*100)
+	ticker := time.NewTicker(time.Millisecond * 100)
 	var sample reflector.ReflectorSample
 	var met stampMetrics = newMetricsRecord()
 	var hist stampHist
@@ -100,7 +100,7 @@ func reflectorOutput(ctx context.Context, args Args) error {
 			}
 		}
 		// print out metrics
-		fmt.Printf("%s \r",met.String())
+		fmt.Printf("%s \r", met.String())
 		//we can't make assumptions regarding session length on reflector side
 		//so we print a file every time we receive a packet
 		if args.Hist == true {

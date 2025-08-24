@@ -51,7 +51,7 @@ func LoadSender(args stamp.Args) senderFD {
 		}
 		log.Fatalf("Error loading programs: %v", err)
 	} else {
-		fmt.Println("All programs successfully loaded and verified\n")
+		fmt.Println("All programs successfully loaded and verified")
 		if args.Debug == true {
 			log.Print(objs.SenderOut.VerifierLog)
 			log.Print(objs.SenderIn.VerifierLog)
@@ -90,6 +90,17 @@ func LoadSender(args stamp.Args) senderFD {
 		objs.Tai.Set(uint16(0))
 	}
 
+	// Check if we have clock syncing
+	if checkSync() == false {
+		if args.Sync == true || args.PTP == true {
+			log.Fatalf("No clock syncing detected with --enforce-sync flag set, aborting")
+		}
+	} else {
+		if checkPTP() == false && args.PTP == true {
+			log.Fatalf("No PTP syncing detected with --enforce-ptp flag set, aborting")
+		}
+	}
+	fmt.Println()
 	return senderFD{Objs: objs, L_in: l_in, L_out: l_out}
 }
 
@@ -104,7 +115,7 @@ func LoadReflector(args stamp.Args) reflectorFD {
 		}
 		log.Fatalf("Error loading programs: %v", err)
 	} else {
-		fmt.Println("All programs successfully loaded and verified\n")
+		fmt.Println("All programs successfully loaded and verified")
 		if args.Debug == true {
 			log.Print(objs.ReflectorIn.VerifierLog)
 			log.Print(objs.ReflectorOut.VerifierLog)
@@ -140,6 +151,16 @@ func LoadReflector(args stamp.Args) reflectorFD {
 	} else {
 		objs.Tai.Set(uint16(0))
 	}
-
+	// Check if we have clock syncing
+	if checkSync() == false {
+		if args.Sync == true || args.PTP == true {
+			log.Fatalf("No clock syncing detected with --enforce-sync flag set, aborting")
+		}
+	} else {
+		if checkPTP() == false && args.PTP == true {
+			log.Fatalf("No PTP syncing detected with --enforce-ptp flag set, aborting")
+		}
+	}
+	fmt.Println()
 	return reflectorFD{Objs: objs, L_in: l_in, L_out: l_out}
 }

@@ -24,7 +24,8 @@ type Args struct {
 	Hist                bool
 	HistB, HistF, HistC uint32
 	HistPath            string
-	Output bool
+	Output              bool
+	Sync, PTP           bool
 }
 
 func StartSession(args Args) {
@@ -43,8 +44,8 @@ func StartSession(args Args) {
 	}
 }
 
-func RefSession(args Args){
-	if args.Output==true {
+func RefSession(args Args) {
+	if args.Output == true {
 		fmt.Println("Printing out session metrics as they arrive")
 		eg, ctx := errgroup.WithContext(context.Background())
 		eg.Go(func() error { return reflectorOutput(ctx, args) })

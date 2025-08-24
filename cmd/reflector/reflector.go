@@ -24,7 +24,7 @@ func main() {
 
 	// does nothing without the --output flag
 	stamp.RefSession(args)
-	
+
 	// hang up
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)

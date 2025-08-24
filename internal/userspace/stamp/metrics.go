@@ -77,7 +77,7 @@ func newRefSample(s *reflector.ReflectorSample) refSample {
 	pktCount++
 	return refSample{
 		seq: s.Seq,
-		sam: (float64)(s.Sam)*1e-6,
+		sam: (float64)(s.Sam) * 1e-6,
 	}
 }
 
