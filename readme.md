@@ -36,6 +36,35 @@ There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If
 ## Clock syncing
 It's important to have clock synchronization between the two machines to ensure precise measurements; however, due to overall complexity of the topic, system clock synchronization is largely left up to the system admin. Nonetheless, there are some features present to help you figure things out.
 
+### TAI offset
+TAI is the only clock that's available for eBPF programs([docs](https://docs.ebpf.io/linux/helper-function/bpf_ktime_get_tai_ns/) so this is what we use for measurements. There is a problem, however: TAI clock is supposed to be offset from UTC by a number of leap seconds(37 as of 2025), which isn't guaranteed on all systems and can produce considerable desync if one machine has its TAI clock offset and the other doesn't. `stamp-bpf` can automatically detect and account for this, adding 37 seconds to its TAI clock if needed. [See here if you want to fix this on your system](https://superuser.com/questions/1156693/is-there-a-way-of-getting-correct-clock-tai-on-linux), although it's not necessary for this program to function. 
+
+### System synchronization
+`stamp-bpf` also offers clock synchronization detection, which comes in two flavors: general sync detection and PTP detection. 
+
+#### General sync detection
+This works by calling `adjtimex()` and detects if there's any kind of system clock adjustment(implying synchronization effort) going on. Should be reliable for any Linux system.
+
+#### PTP detection
+This one is a lot more finnicky and makes some assumptions. Basically, we assume that the system is using `linuxptp` to enable PTP, and given how `linuxptp` tools(namely `ptp4l`) print to systemlog, we use Bash to grep it for recent `ptp4l` records.
+This will give a false negative if:
+- Your system doesn't have `systemd`
+- Your `linuxptp` tools are configured to output no logs
+- You're using a different PTP tool(please let me know if you do and I'll do my best to improve detection)
+- Your system somehow doesn't have `grep` or `tail`
+
+#### Synchronization enforcement
+There are two CLI flags for if you really care about clock syncing and don't want to make measurements unless it is present.
+- `--enforce-sync` will abort execution if general sync detection returns a negative
+- `--enforce-ptp` will abort execution if PTP detection returns a negative
+
+### Desync
+Nonetheless, despite all your efforts, you might see an output that looks like this:
+![](assets/desync.png)
+In this case, attempting to calculate latency from two timestamps results in a negative number, which causes a variable overflow. This happens if the delta between two machines' clocks is larger than actual network latency between the machines. It's not necessarily lack of synchronization - in this screenshot, both machines are NTP-synced to the same server, however I'm testing over LAN so the network latency is low enough for this to still happen. Note that you can still trust roundtrip measurement as both timestamps for it are made on the sender machine. If you want to test over low-latency networks like LANs, consider enabling PTP and ensuring both machines syncronize to the same master clock.
+
+(also note that the 37s delay due to lack of TAI offset is present on the far-end, although that isn't the root cause and the issue was still present with TAI clocks properly offset on both machines)
+
 ## Troubleshooting
 `stamp-bpf` emits descriptive messages in case of error, however, not every error can be accounted for so here's some pointers for potential problems.
 
