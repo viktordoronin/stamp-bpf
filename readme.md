@@ -33,11 +33,25 @@ sender eth0 111.222.33.44 -c100 -i 0.5 -d 1000 -s 1001
 ```
 There are `ping`-like options for packet count(`-c`) and send interval(`-i`). If you specified a finite number of packets to send it will quit on its own once all packets are accounted for(received or lost). It only does one STAMP session at a time. 
 
+## Troubleshooting
+`stamp-bpf` emits descriptive messages in case of error, however, not every error can be accounted for so here's some pointers for potential problems. Also see [here](#desync) for potential clock synchronization issues.
+
+### BPF
+If instead of `All programs successfully loaded and verified` line you get an error, it means the BPF program has failed to load. Obviously, I test my code to ensure this doesn't happen, so any and all such occurences are likely caused by system configuration. Make sure your kernel version matches the requirements, or there are possibly some [kernel flags](https://eunomia.dev/en/tutorials/bcc-documents/kernel_config_en/) that are missing.
+
+### Network issues
+Once the program has successfully started, you might see that packets are being sent but none are coming back. 
+- Check your network and/or firewall configuration - something might be blocking traffic
+- Make sure reflector is running on the receiving side
+- Make sure you're sending packets to the right IP
+- Make sure you're listening on the correct network device - both for sender and reflector
+- If all else fails and you're filing a bug report, please include a Wireshark pcap from both sender and reflector sides if possible
+
 ## Clock syncing
 It's important to have clock synchronization between the two machines to ensure precise measurements; however, due to overall complexity of the topic, system clock synchronization is largely left up to the system admin. Nonetheless, there are some features present to help you figure things out.
 
 ### TAI offset
-TAI is the only clock that's available for eBPF programs([docs](https://docs.ebpf.io/linux/helper-function/bpf_ktime_get_tai_ns/) so this is what we use for measurements. There is a problem, however: TAI clock is supposed to be offset from UTC by a number of leap seconds(37 as of 2025), which isn't guaranteed on all systems and can produce considerable desync if one machine has its TAI clock offset and the other doesn't. `stamp-bpf` can automatically detect and account for this, adding 37 seconds to its TAI clock if needed. [See here if you want to fix this on your system](https://superuser.com/questions/1156693/is-there-a-way-of-getting-correct-clock-tai-on-linux), although it's not necessary for this program to function. 
+TAI is the only clock that's available for eBPF programs([docs](https://docs.ebpf.io/linux/helper-function/bpf_ktime_get_tai_ns/)) so this is what we use for measurements. There is a problem, however: TAI clock is supposed to be offset from UTC by a number of leap seconds(37 as of 2025), which isn't guaranteed on all systems and can produce considerable desync if one machine has its TAI clock offset and the other doesn't. `stamp-bpf` can automatically detect and account for this, adding 37 seconds to its TAI clock if needed. [See here if you want to fix this on your system](https://superuser.com/questions/1156693/is-there-a-way-of-getting-correct-clock-tai-on-linux), although it's not necessary for this program to function. 
 
 ### System synchronization
 `stamp-bpf` also offers clock synchronization detection, which comes in two flavors: general sync detection and PTP detection. 
@@ -65,11 +79,16 @@ In this case, attempting to calculate latency from two timestamps results in a n
 
 (also note that the 37s delay due to lack of TAI offset is present on the far-end, although that isn't the root cause and the issue was still present with TAI clocks properly offset on both machines)
 
-## Troubleshooting
-`stamp-bpf` emits descriptive messages in case of error, however, not every error can be accounted for so here's some pointers for potential problems.
-
 ## Histogram
-`stamp-bpf` includes option for histogram output which you can then interpret and visualize however you like. 
+`stamp-bpf` includes option for histogram output. A histogram consists of N bins(configurable), each counting packets that fall into the bin's latency range. It's output in the form of a simple text file, interpretation and visualization of which is left up to the user. 
+- `--hist <bins> <min> <max>` in CLI to enable histogram output
+- `--histpath <path>` to provide path for output file
+- Leftmost and rightmost bins are reserved for outlier packets that fall outside of specified min-max range
+- Min-max range is divided equally among the remaining bins
+- Each bin counts packets that fell into its range
+- For sender, the histogram is saved only when the session concludes, but not when program exits prematurely or it's set to send infinite packets
+- For reflector, the histogram is updated on each arriving packet - yes, this doesn't work well when reflector receives several sessions at once, not until I implement Stateful mode. 
+- To enable this on the reflector, additionally specify `--output` flag
 
 ## Upcoming features
 - Stateful mode([RFC](https://datatracker.ietf.org/doc/html/rfc8762#name-theory-of-operation)) - have `reflector` track individual sessions and get directional packet loss measurements at the end of a test.
