@@ -1,7 +1,7 @@
 # STAMP implementation for Go
 This is a STAMP Protocol([RFC 8762](https://datatracker.ietf.org/doc/html/rfc8762)) implementation using Go and eBPF. So far it only implements stateless unauthenticated mode and only supports amd64(if you have an ARM machine please consider contributing to a port!). It's a fully functional implementation, although I've yet to test it against an actual STAMP-capable network device like Cisco or Juniper.
 
-[](assets/demo.webm)
+[](https://github.com/user-attachments/assets/5e2eb5ed-a97a-4634-9ed6-c5676a687a51)
 
 ## Requirements
 - 6.6 kernel
