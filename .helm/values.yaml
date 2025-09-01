@@ -1,0 +1,160 @@
+# Default values for stamp-bpf chart
+# This chart deploys both sender and reflector components of the stamp-bpf application
+# as DaemonSets to ensure they run on each node where network measurements are needed.
+
+# Global configuration
+global:
+  # Image configuration for both sender and reflector components
+  image:
+    repository: viktordoronin/stamp-bpf
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Node selector for scheduling pods on specific nodes
+  nodeSelector: {}
+  
+  # Tolerations for node taints
+  tolerations: []
+  
+  # Affinity rules for pod placement
+  affinity: {}
+  
+  # Global security configuration
+  security:
+    # Pod security context
+    podSecurityContext: {}
+    # Container security context
+    containerSecurityContext: {}
+
+# Sender configuration
+# The sender component sends STAMP packets to reflector targets
+sender:
+  # Enable/disable sender deployment
+  enabled: true
+  
+  # Interface to attach to for packet capture/transmission
+  interface: "eth0"
+  
+  # Reflector IP addresses (list to support multiple targets)
+  reflectorIPs: []
+  
+  # Source port for sending packets
+  sourcePort: 862
+  
+  # Destination port for sending packets
+  destinationPort: 862
+  
+  # Number of packets to send (0 for infinite)
+  count: 0
+  
+  # Interval between packets (seconds)
+  interval: 1.0
+  
+  # Timeout before packet considered lost (seconds)
+  timeout: 1
+  
+  # Debug mode flag
+  debug: false
+  
+  # Command to run for the sender component
+  command: "/usr/local/bin/sender"
+  
+  # Histogram configuration for sender
+  histogram:
+    # Enable histogram collection
+    enabled: false
+    # Number of histogram bins
+    bins: 28
+    # Histogram floor value (log10 scale)
+    floor: 25
+    # Histogram ceiling value (log10 scale)
+    ceiling: 75
+    # Path to store histogram data
+    path: "/tmp/sender-hist"
+  
+  # Clock sync enforcement options
+  enforceSync: false
+  enforcePTP: false
+  
+  # Resource limits and requests for the sender container
+  resources: {}
+  
+  # Additional container arguments
+  extraArgs: []
+
+# Reflector configuration
+# The reflector component receives STAMP packets and sends responses
+reflector:
+  # Enable/disable reflector deployment
+  enabled: true
+  
+  # Interface to attach to for packet capture
+  interface: "eth0"
+  
+  # Port to listen on for incoming packets
+  port: 862
+  
+  # Debug mode flag
+  debug: false
+  
+  # Enable output for histogram and simultaneous sessions
+  output: false
+  
+  # Histogram configuration for reflector
+  histogram:
+    # Enable histogram collection
+    enabled: false
+    # Number of histogram bins
+    bins: 28
+    # Histogram floor value (log10 scale)
+    floor: 25
+    # Histogram ceiling value (log10 scale)
+    ceiling: 75
+    # Path to store histogram data
+    path: "/tmp/reflector-hist"
+  
+  # Clock sync enforcement options
+  enforceSync: false
+  enforcePTP: false
+  
+  # Resource limits and requests for the reflector container
+  resources: {}
+  
+  # Additional container arguments
+  extraArgs: []
+  
+  # Command to run for the reflector component
+  command: "/usr/local/bin/reflector"
+
+# Monitoring configuration
+# Configuration for PodMonitor resources to collect metrics
+monitoring:
+  # Enable PodMonitor creation for metrics collection
+  enabled: true
+  
+  # Scrape interval for metrics collection
+  interval: 15s
+  
+  # Additional relabeling rules for PodMonitor
+  relabelings: []
+
+# Security configuration
+# Security settings for pods and containers
+# These values override global.security settings when defined
+security:
+  # Pod security context
+  podSecurityContext: {}
+  
+  # Container security context with privileged mode enabled
+  containerSecurityContext:
+    privileged: true
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+  # Annotations to add to the service account
+  annotations: {}
