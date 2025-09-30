@@ -1,0 +1,32 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "stamp-bpf.sender.podmonitor" . }}
+  namespace: {{ include "stamp-bpf.namespace" . }}
+  labels:
+    {{- include "stamp-bpf.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sender
+spec:
+  selector:
+    matchLabels:
+      {{- include "stamp-bpf.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sender
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.monitoring.interval }}
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+          replacement: ${1}
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+          replacement: ${1}
+        - sourceLabels: [__meta_kubernetes_pod_ip]
+          targetLabel: pod_ip
+          replacement: ${1}
+        {{- if .Values.monitoring.relabelings }}
+        {{- toYaml .Values.monitoring.relabelings | nindent 8 }}
+        {{- end }}
+{{- end }}

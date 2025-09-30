@@ -1,0 +1,95 @@
+{{- if .Values.sender.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "stamp-bpf.sender.fullname" . }}
+  namespace: {{ include "stamp-bpf.namespace" . }}
+  labels:
+    {{- include "stamp-bpf.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sender
+spec:
+  selector:
+    matchLabels:
+      {{- include "stamp-bpf.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sender
+  template:
+    metadata:
+      labels:
+        {{- include "stamp-bpf.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sender
+    spec:
+      {{- with include "stamp-bpf.nodeSelector" . }}
+      nodeSelector:
+        {{- . | nindent 8 }}
+      {{- end }}
+      {{- with include "stamp-bpf.tolerations" . }}
+      tolerations:
+        {{- . | nindent 8 }}
+      {{- end }}
+      {{- with include "stamp-bpf.affinity" . }}
+      affinity:
+        {{- . | nindent 8 }}
+      {{- end }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: {{ include "stamp-bpf.sender.fullname" . }}
+      {{- with include "stamp-bpf.podSecurityContext" . }}
+      securityContext:
+        {{- . | nindent 8 }}
+      {{- end }}
+      containers:
+        {{- range $index, $reflectorIP := .Values.sender.reflectorIPs }}
+        - name: {{ printf "sender-%d" $index }}
+          image: {{ include "stamp-bpf.sender.image" $ }}
+          {{- $pullPolicy := "" }}
+          {{- if and $.Values.sender.image (hasKey $.Values.sender.image "pullPolicy") }}
+            {{- $pullPolicy = $.Values.sender.image.pullPolicy }}
+          {{- else if and $.Values.global.image (hasKey $.Values.global.image "pullPolicy") }}
+            {{- $pullPolicy = $.Values.global.image.pullPolicy }}
+          {{- else }}
+            {{- $pullPolicy = "IfNotPresent" }}{{/* Or another sensible default */}}
+          {{- end }}
+          imagePullPolicy: {{ $pullPolicy }}
+          securityContext:
+            {{- include "stamp-bpf.containerSecurityContext" $ | nindent 12 }}
+          command: [{{ $.Values.sender.command | default "/usr/local/bin/sender" | quote }}]
+          args:
+            {{- include "stamp-bpf.sender.args" (dict "Values" $.Values "reflectorIP" $reflectorIP) | nindent 12 }}
+          env:
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          {{- with $.Values.sender.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- if eq (len .Values.sender.reflectorIPs) 0 }}
+        - name: sender
+          image: {{ include "stamp-bpf.sender.image" . }}
+          {{- $pullPolicy := "" }}
+          {{- if and $.Values.sender.image (hasKey $.Values.sender.image "pullPolicy") }}
+            {{- $pullPolicy = $.Values.sender.image.pullPolicy }}
+          {{- else if and $.Values.global.image (hasKey $.Values.global.image "pullPolicy") }}
+            {{- $pullPolicy = $.Values.global.image.pullPolicy }}
+          {{- else }}
+            {{- $pullPolicy = "IfNotPresent" }}{{/* Or another sensible default */}}
+          {{- end }}
+          imagePullPolicy: {{ $pullPolicy }}         
+          securityContext:
+            {{- include "stamp-bpf.containerSecurityContext" . | nindent 12 }}
+          command: [{{ .Values.sender.command | default "/usr/local/bin/sender" | quote }}]
+          args:
+            {{- include "stamp-bpf.sender.args" (dict "Values" .Values) | nindent 12 }}
+          env:
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          {{- with .Values.sender.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
+{{- end }}
