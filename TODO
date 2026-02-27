@@ -1,4 +1,7 @@
  TODO: docker build
  TODO: unified binary
+ TODO: test suite
  TODO: anchoring
  TODO: docker image
+ TODO: prometheus exporter
+ TODO: wireshark dissector
